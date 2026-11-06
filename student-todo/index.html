@@ -9,17 +9,43 @@
 </head>
 
 <body>
+    <section class="auth-shell" id="authShell" aria-labelledby="authHeading">
+        <div class="auth-card">
+            <p class="eyebrow">STUDY DESK</p>
+            <h1 id="authHeading">Your work, wherever you are.</h1>
+            <p class="subtitle">Sign in to keep your study plan synced across devices.</p>
+            <div class="auth-tabs" role="tablist" aria-label="Account actions">
+                <button class="auth-tab active" id="loginTab" type="button" role="tab" aria-selected="true">Log
+                    in</button>
+                <button class="auth-tab" id="signupTab" type="button" role="tab" aria-selected="false">Create
+                    account</button>
+            </div>
+            <form id="authForm">
+                <label for="authEmail">Email</label>
+                <input id="authEmail" type="email" autocomplete="email" required>
+                <label for="authPassword">Password</label>
+                <input id="authPassword" type="password" minlength="6" autocomplete="current-password" required>
+                <button class="add-button auth-submit" id="authSubmit" type="submit">Log in</button>
+            </form>
+            <p class="auth-message" id="authMessage" role="alert"></p>
+            <p class="config-message" id="configMessage" hidden>Supabase is not configured yet. Add the project URL and
+                publishable key in <strong>config.js</strong>.</p>
+        </div>
+    </section>
 
-    <main class="app-shell">
+    <main class="app-shell" id="appShell" hidden>
         <header class="topbar">
             <div>
                 <p class="eyebrow">STUDY DESK</p>
                 <h1>Make room for what matters.</h1>
                 <p class="subtitle">A calm place to plan your next small win.</p>
+                <p class="user-info" id="userInfo"></p>
             </div>
-            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode">
-                <span aria-hidden="true">Dark</span>
-            </button>
+            <div class="topbar-actions">
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode"><span
+                        aria-hidden="true">Dark</span></button>
+                <button class="logout-button" id="logoutButton" type="button">Log out</button>
+            </div>
         </header>
 
         <section class="dashboard" aria-label="Task progress">
@@ -63,9 +89,13 @@
             </div>
             <ul id="taskList" aria-live="polite"></ul>
             <p class="empty-state" id="emptyState">Your list is clear. Add a task to get started.</p>
+            <p class="loading-state" id="loadingState" hidden>Loading your tasks...</p>
+            <p class="error-state" id="taskError" role="alert" hidden></p>
         </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="script.js"></script>
 
 </body>

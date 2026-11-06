@@ -3,19 +3,95 @@ const prioritySelect = document.getElementById("prioritySelect");
 const taskForm = document.getElementById("taskForm");
 const taskList = document.getElementById("taskList");
 const emptyState = document.getElementById("emptyState");
+const loadingState = document.getElementById("loadingState");
+const taskError = document.getElementById("taskError");
 const filterButtons = document.querySelectorAll(".filter-button");
 const themeToggle = document.getElementById("themeToggle");
-const storageKey = "studentTodoTasks";
+const authShell = document.getElementById("authShell");
+const appShell = document.getElementById("appShell");
+const authForm = document.getElementById("authForm");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmit = document.getElementById("authSubmit");
+const authMessage = document.getElementById("authMessage");
+const configMessage = document.getElementById("configMessage");
+const loginTab = document.getElementById("loginTab");
+const signupTab = document.getElementById("signupTab");
+const logoutButton = document.getElementById("logoutButton");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
-let tasks = loadTasks();
+let authMode = "login";
+let tasks = [];
+let currentUser = null;
 
-function loadTasks() {
-    try { return JSON.parse(localStorage.getItem(storageKey)) || []; }
-    catch (error) { return []; }
+const config = window.SUPABASE_CONFIG;
+const supabaseClient = config?.url && config?.publishableKey && window.supabase
+    ? window.supabase.createClient(config.url, config.publishableKey)
+    : null;
+
+function showAuthMessage(message = "", isError = true) {
+    authMessage.textContent = message;
+    authMessage.classList.toggle("is-error", isError && Boolean(message));
 }
 
-function saveTasks() { localStorage.setItem(storageKey, JSON.stringify(tasks)); }
+function showTaskError(message = "") {
+    taskError.textContent = message;
+    taskError.hidden = !message;
+}
+
+function setTaskLoading(isLoading) {
+    loadingState.hidden = !isLoading;
+    taskForm.querySelector("button").disabled = isLoading;
+}
+
+function setAuthMode(mode) {
+    authMode = mode;
+    const isLogin = mode === "login";
+    loginTab.classList.toggle("active", isLogin);
+    signupTab.classList.toggle("active", !isLogin);
+    loginTab.setAttribute("aria-selected", isLogin);
+    signupTab.setAttribute("aria-selected", !isLogin);
+    authSubmit.textContent = isLogin ? "Log in" : "Create account";
+    authPassword.autocomplete = isLogin ? "current-password" : "new-password";
+    showAuthMessage();
+}
+
+async function handleAuth(event) {
+    event.preventDefault();
+    if (!supabaseClient) return;
+    authSubmit.disabled = true;
+    authSubmit.textContent = authMode === "login" ? "Logging in..." : "Creating...";
+    showAuthMessage();
+    const result = authMode === "login"
+        ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
+        : await supabaseClient.auth.signUp({ email: authEmail.value.trim(), password: authPassword.value });
+    authSubmit.disabled = false;
+    authSubmit.textContent = authMode === "login" ? "Log in" : "Create account";
+    if (result.error) {
+        showAuthMessage(result.error.message);
+        return;
+    }
+    if (authMode === "signup" && !result.data.session) {
+        showAuthMessage("Account created. Check your email to confirm it, then log in.", false);
+        authForm.reset();
+    }
+}
+
+function showApp(user) {
+    currentUser = user;
+    authShell.hidden = true;
+    appShell.hidden = false;
+    document.getElementById("userInfo").textContent = user.email;
+    loadTasks();
+}
+
+function showAuth() {
+    currentUser = null;
+    tasks = [];
+    authShell.hidden = false;
+    appShell.hidden = true;
+    authPassword.value = "";
+}
 
 function renderTasks() {
     const visibleTasks = tasks.filter((task) => activeFilter === "all" || (activeFilter === "completed" ? task.completed : !task.completed));
@@ -28,7 +104,7 @@ function renderTasks() {
         toggle.type = "button";
         toggle.setAttribute("aria-label", task.completed ? `Mark ${task.text} as active` : `Complete ${task.text}`);
         toggle.textContent = task.completed ? "Done" : "";
-        toggle.addEventListener("click", () => toggleTask(task.id));
+        toggle.addEventListener("click", () => toggleTask(task.id, task.completed));
 
         const content = document.createElement("div");
         content.className = "task-content";
@@ -62,35 +138,57 @@ function renderTasks() {
     emptyState.textContent = tasks.length && activeFilter !== "all" ? `No ${activeFilter} tasks here.` : "Your list is clear. Add a task to get started.";
 }
 
-function addTask(event) {
+function mapTask(task) {
+    return { id: task.id, text: task.text, priority: task.priority || "medium", completed: Boolean(task.completed) };
+}
+
+async function loadTasks() {
+    if (!currentUser) return;
+    setTaskLoading(true);
+    showTaskError();
+    const { data, error } = await supabaseClient.from("Tasks").select("*").eq("user_id", currentUser.id);
+    setTaskLoading(false);
+    if (error) {
+        showTaskError(`Could not load tasks: ${error.message}`);
+        return;
+    }
+    tasks = data.map(mapTask);
+    renderTasks();
+}
+
+async function addTask(event) {
     event.preventDefault();
     const taskText = taskInput.value.trim();
-    if (!taskText) { taskInput.focus(); return; }
-    tasks.unshift({ id: Date.now().toString(), text: taskText, priority: prioritySelect.value, completed: false });
-    saveTasks();
+    if (!taskText || !currentUser) { taskInput.focus(); return; }
+    setTaskLoading(true);
+    showTaskError();
+    const { data, error } = await supabaseClient.from("Tasks").insert({ text: taskText, priority: prioritySelect.value, completed: false, user_id: currentUser.id }).select().single();
+    setTaskLoading(false);
+    if (error) {
+        showTaskError(`Could not add task: ${error.message}`);
+        return;
+    }
+    tasks.unshift(mapTask(data));
     renderTasks();
     taskForm.reset();
     taskInput.focus();
 }
 
-function toggleTask(id) {
-    tasks = tasks.map((task) => task.id === id ? { ...task, completed: !task.completed } : task);
-    saveTasks();
+async function toggleTask(id, completed) {
+    showTaskError();
+    const { error } = await supabaseClient.from("Tasks").update({ completed: !completed }).eq("id", id).eq("user_id", currentUser.id);
+    if (error) { showTaskError(`Could not update task: ${error.message}`); return; }
+    tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
     renderTasks();
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
+    showTaskError();
+    const { error } = await supabaseClient.from("Tasks").delete().eq("id", id).eq("user_id", currentUser.id);
+    if (error) { showTaskError(`Could not delete task: ${error.message}`); return; }
     tasks = tasks.filter((task) => task.id !== id);
-    saveTasks();
     renderTasks();
 }
-
-taskForm.addEventListener("submit", addTask);
-filterButtons.forEach((button) => button.addEventListener("click", () => {
-    activeFilter = button.dataset.filter;
-    filterButtons.forEach((item) => item.classList.toggle("active", item === button));
-    renderTasks();
-}));
 
 function setTheme(theme) {
     document.body.dataset.theme = theme;
@@ -99,7 +197,33 @@ function setTheme(theme) {
     localStorage.setItem(themeKey, theme);
 }
 
+async function initialize() {
+    setTheme(localStorage.getItem(themeKey) || "light");
+    document.getElementById("taskDate").textContent = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date());
+    if (!supabaseClient) {
+        configMessage.hidden = false;
+        authSubmit.disabled = true;
+        return;
+    }
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.user) showApp(session.user); else showAuth();
+    supabaseClient.auth.onAuthStateChange((_event, sessionState) => {
+        if (sessionState?.user) showApp(sessionState.user); else showAuth();
+    });
+}
+
+taskForm.addEventListener("submit", addTask);
+authForm.addEventListener("submit", handleAuth);
+loginTab.addEventListener("click", () => setAuthMode("login"));
+signupTab.addEventListener("click", () => setAuthMode("signup"));
+logoutButton.addEventListener("click", async () => {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) showTaskError(`Could not log out: ${error.message}`);
+});
+filterButtons.forEach((button) => button.addEventListener("click", () => {
+    activeFilter = button.dataset.filter;
+    filterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    renderTasks();
+}));
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
-setTheme(localStorage.getItem(themeKey) || "light");
-document.getElementById("taskDate").textContent = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date());
-renderTasks();
+initialize();
