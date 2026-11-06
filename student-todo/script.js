@@ -63,6 +63,12 @@ function setAuthLoading(isLoading) {
         : (authMode === "login" ? "Log in" : "Create account");
 }
 
+function getEmailRedirectUrl() {
+    return window.location.protocol === "http:" || window.location.protocol === "https:"
+        ? window.location.href.split("#")[0]
+        : undefined;
+}
+
 async function handleAuth(event) {
     event.preventDefault();
     if (!supabaseClient) {
@@ -74,13 +80,17 @@ async function handleAuth(event) {
     try {
         const result = authMode === "login"
             ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
-            : await supabaseClient.auth.signUp({ email: authEmail.value.trim(), password: authPassword.value });
+            : await supabaseClient.auth.signUp({
+                email: authEmail.value.trim(),
+                password: authPassword.value,
+                options: { emailRedirectTo: getEmailRedirectUrl() }
+            });
         if (result.error) {
             showAuthMessage(result.error.message);
             return;
         }
         if (authMode === "signup" && !result.data.session) {
-            showAuthMessage("Account created. Check your email to confirm it, then log in.", false);
+            showAuthMessage("Account created. Check your email and confirm your account before logging in.", false);
             authForm.reset();
         }
     } catch (error) {
