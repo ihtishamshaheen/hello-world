@@ -56,24 +56,37 @@ function setAuthMode(mode) {
     showAuthMessage();
 }
 
+function setAuthLoading(isLoading) {
+    authSubmit.disabled = isLoading;
+    authSubmit.textContent = isLoading
+        ? (authMode === "login" ? "Logging in..." : "Creating...")
+        : (authMode === "login" ? "Log in" : "Create account");
+}
+
 async function handleAuth(event) {
     event.preventDefault();
-    if (!supabaseClient) return;
-    authSubmit.disabled = true;
-    authSubmit.textContent = authMode === "login" ? "Logging in..." : "Creating...";
-    showAuthMessage();
-    const result = authMode === "login"
-        ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
-        : await supabaseClient.auth.signUp({ email: authEmail.value.trim(), password: authPassword.value });
-    authSubmit.disabled = false;
-    authSubmit.textContent = authMode === "login" ? "Log in" : "Create account";
-    if (result.error) {
-        showAuthMessage(result.error.message);
+    if (!supabaseClient) {
+        showAuthMessage("Supabase is not configured. Check config.js.");
         return;
     }
-    if (authMode === "signup" && !result.data.session) {
-        showAuthMessage("Account created. Check your email to confirm it, then log in.", false);
-        authForm.reset();
+    setAuthLoading(true);
+    showAuthMessage();
+    try {
+        const result = authMode === "login"
+            ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
+            : await supabaseClient.auth.signUp({ email: authEmail.value.trim(), password: authPassword.value });
+        if (result.error) {
+            showAuthMessage(result.error.message);
+            return;
+        }
+        if (authMode === "signup" && !result.data.session) {
+            showAuthMessage("Account created. Check your email to confirm it, then log in.", false);
+            authForm.reset();
+        }
+    } catch (error) {
+        showAuthMessage(`Authentication failed: ${error.message}`);
+    } finally {
+        setAuthLoading(false);
     }
 }
 
@@ -81,7 +94,7 @@ function showApp(user) {
     currentUser = user;
     authShell.hidden = true;
     appShell.hidden = false;
-    document.getElementById("userInfo").textContent = user.email;
+    document.getElementById("userInfo").textContent = `Signed in as ${user.email}`;
     loadTasks();
 }
 
@@ -217,8 +230,15 @@ authForm.addEventListener("submit", handleAuth);
 loginTab.addEventListener("click", () => setAuthMode("login"));
 signupTab.addEventListener("click", () => setAuthMode("signup"));
 logoutButton.addEventListener("click", async () => {
-    const { error } = await supabaseClient.auth.signOut();
-    if (error) showTaskError(`Could not log out: ${error.message}`);
+    logoutButton.disabled = true;
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) showTaskError(`Could not log out: ${error.message}`);
+    } catch (error) {
+        showTaskError(`Could not log out: ${error.message}`);
+    } finally {
+        logoutButton.disabled = false;
+    }
 });
 filterButtons.forEach((button) => button.addEventListener("click", () => {
     activeFilter = button.dataset.filter;
