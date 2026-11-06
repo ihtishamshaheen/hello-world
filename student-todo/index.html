@@ -3,19 +3,68 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Student To-Do List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Desk | Student To-Do List</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <h1>My Student To-Do List</h1>
+    <main class="app-shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">STUDY DESK</p>
+                <h1>Make room for what matters.</h1>
+                <p class="subtitle">A calm place to plan your next small win.</p>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode">
+                <span aria-hidden="true">Dark</span>
+            </button>
+        </header>
 
-    <input type="text" id="taskInput" placeholder="Enter your task">
+        <section class="dashboard" aria-label="Task progress">
+            <div class="progress-copy">
+                <span class="section-label">TODAY'S PROGRESS</span>
+                <strong id="progressText">0 of 0 complete</strong>
+                <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
+            </div>
+            <div class="stat"><span id="totalCount">0</span><small>Total</small></div>
+            <div class="stat"><span id="activeCount">0</span><small>Active</small></div>
+            <div class="stat"><span id="completedCount">0</span><small>Done</small></div>
+        </section>
 
-    <button onclick="addTask()">Add Task</button>
-
-    <ul id="taskList"></ul>
+        <section class="task-panel" aria-labelledby="tasks-heading">
+            <div class="panel-heading">
+                <div>
+                    <span class="section-label">YOUR LIST</span>
+                    <h2 id="tasks-heading">Tasks</h2>
+                </div>
+                <span class="task-date" id="taskDate"></span>
+            </div>
+            <form class="task-form" id="taskForm">
+                <label class="sr-only" for="taskInput">Task name</label>
+                <input type="text" id="taskInput" placeholder="What needs your attention?" maxlength="120"
+                    autocomplete="off">
+                <label class="sr-only" for="prioritySelect">Task priority</label>
+                <select id="prioritySelect" aria-label="Task priority">
+                    <option value="low">Low priority</option>
+                    <option value="medium" selected>Medium priority</option>
+                    <option value="high">High priority</option>
+                </select>
+                <button class="add-button" type="submit">Add task</button>
+            </form>
+            <div class="list-toolbar">
+                <div class="filters" role="group" aria-label="Filter tasks">
+                    <button class="filter-button active" type="button" data-filter="all">All</button>
+                    <button class="filter-button" type="button" data-filter="active">Active</button>
+                    <button class="filter-button" type="button" data-filter="completed">Completed</button>
+                </div>
+                <span class="list-count" id="listCount">0 tasks</span>
+            </div>
+            <ul id="taskList" aria-live="polite"></ul>
+            <p class="empty-state" id="emptyState">Your list is clear. Add a task to get started.</p>
+        </section>
+    </main>
 
     <script src="script.js"></script>
 
