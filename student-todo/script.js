@@ -142,6 +142,7 @@ function showAuth() {
     authPassword.type = "password";
     passwordToggle.setAttribute("aria-label", "Show password");
     passwordToggle.setAttribute("aria-pressed", "false");
+    passwordToggle.textContent = "👁̸";
 }
 
 async function requireManualLoginAfterConfirmation() {
@@ -309,6 +310,7 @@ passwordToggle.addEventListener("click", () => {
     authPassword.type = isVisible ? "password" : "text";
     passwordToggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
     passwordToggle.setAttribute("aria-pressed", String(!isVisible));
+    passwordToggle.textContent = isVisible ? "👁̸" : "👁";
 });
 logoutButton.addEventListener("click", async () => {
     logoutButton.disabled = true;
