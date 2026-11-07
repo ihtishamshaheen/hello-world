@@ -103,6 +103,34 @@ button {
     width: 100%;
 }
 
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 48px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    padding: 0;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1rem;
+}
+
+.password-toggle:hover {
+    color: var(--accent);
+}
+
 .auth-submit {
     width: 100%;
     margin-top: 20px;

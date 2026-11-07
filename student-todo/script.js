@@ -12,6 +12,7 @@ const appShell = document.getElementById("appShell");
 const authForm = document.getElementById("authForm");
 const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
+const passwordToggle = document.getElementById("passwordToggle");
 const authSubmit = document.getElementById("authSubmit");
 const authMessage = document.getElementById("authMessage");
 const configMessage = document.getElementById("configMessage");
@@ -19,6 +20,7 @@ const loginTab = document.getElementById("loginTab");
 const signupTab = document.getElementById("signupTab");
 const logoutButton = document.getElementById("logoutButton");
 const themeKey = "studentTodoTheme";
+const pendingConfirmationKey = "studentTodoPendingConfirmation";
 let activeFilter = "all";
 let authMode = "login";
 let tasks = [];
@@ -69,6 +71,7 @@ function setConfirmationState(isSent) {
     confirmationSent = isSent;
     authEmail.disabled = isSent;
     authPassword.disabled = isSent;
+    passwordToggle.disabled = isSent;
     loginTab.disabled = isSent;
     signupTab.disabled = isSent;
     authShell.classList.toggle("confirmation-state", isSent);
@@ -111,6 +114,7 @@ async function handleAuth(event) {
                 showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Check your inbox and confirm your account before logging in.`, false);
                 authPassword.value = "";
                 setConfirmationState(true);
+                localStorage.setItem(pendingConfirmationKey, "true");
             }
         }
     } catch (error) {
@@ -135,6 +139,17 @@ function showAuth() {
     authShell.hidden = false;
     appShell.hidden = true;
     authPassword.value = "";
+    authPassword.type = "password";
+    passwordToggle.setAttribute("aria-label", "Show password");
+    passwordToggle.setAttribute("aria-pressed", "false");
+}
+
+async function requireManualLoginAfterConfirmation() {
+    localStorage.removeItem(pendingConfirmationKey);
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+    showAuth();
+    showAuthMessage("Email confirmed. Please enter your email and password to log in.", false);
 }
 
 function renderTasks() {
@@ -250,9 +265,26 @@ async function initialize() {
         return;
     }
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session?.user) showApp(session.user); else showAuth();
+    if (session?.user && localStorage.getItem(pendingConfirmationKey) === "true") {
+        await requireManualLoginAfterConfirmation();
+    } else if (session?.user) {
+        showApp(session.user);
+    } else {
+        showAuth();
+    }
     supabaseClient.auth.onAuthStateChange((_event, sessionState) => {
-        if (sessionState?.user) showApp(sessionState.user); else showAuth();
+        if (sessionState?.user && localStorage.getItem(pendingConfirmationKey) === "true") {
+            setTimeout(() => {
+                requireManualLoginAfterConfirmation().catch((error) => {
+                    showAuth();
+                    showAuthMessage(`Could not prepare the login screen: ${error.message}`);
+                });
+            }, 0);
+        } else if (sessionState?.user) {
+            showApp(sessionState.user);
+        } else {
+            showAuth();
+        }
     });
 }
 
@@ -260,6 +292,12 @@ taskForm.addEventListener("submit", addTask);
 authForm.addEventListener("submit", handleAuth);
 loginTab.addEventListener("click", () => setAuthMode("login"));
 signupTab.addEventListener("click", () => setAuthMode("signup"));
+passwordToggle.addEventListener("click", () => {
+    const isVisible = authPassword.type === "text";
+    authPassword.type = isVisible ? "password" : "text";
+    passwordToggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+    passwordToggle.setAttribute("aria-pressed", String(!isVisible));
+});
 logoutButton.addEventListener("click", async () => {
     logoutButton.disabled = true;
     try {

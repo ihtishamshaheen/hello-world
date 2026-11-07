@@ -24,7 +24,11 @@
                 <label for="authEmail">Email</label>
                 <input id="authEmail" type="email" autocomplete="email" required>
                 <label for="authPassword">Password</label>
-                <input id="authPassword" type="password" minlength="6" autocomplete="current-password" required>
+                <div class="password-field">
+                    <input id="authPassword" type="password" minlength="6" autocomplete="current-password" required>
+                    <button class="password-toggle" id="passwordToggle" type="button" aria-label="Show password"
+                        aria-pressed="false">👁</button>
+                </div>
                 <button class="add-button auth-submit" id="authSubmit" type="submit">Log in</button>
             </form>
             <p class="auth-message" id="authMessage" role="alert"></p>
