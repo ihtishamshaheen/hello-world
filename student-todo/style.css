@@ -108,6 +108,16 @@ button {
     margin-top: 20px;
 }
 
+.confirmation-state .auth-tabs,
+.confirmation-state form {
+    opacity: 0.55;
+}
+
+.confirmation-state .auth-message {
+    color: #387052;
+    font-weight: 600;
+}
+
 .auth-message,
 .config-message,
 .error-state {

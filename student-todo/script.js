@@ -23,6 +23,7 @@ let activeFilter = "all";
 let authMode = "login";
 let tasks = [];
 let currentUser = null;
+let confirmationSent = false;
 
 const config = window.SUPABASE_CONFIG;
 const supabaseClient = config?.url && config?.publishableKey && window.supabase
@@ -45,6 +46,7 @@ function setTaskLoading(isLoading) {
 }
 
 function setAuthMode(mode) {
+    if (confirmationSent) return;
     authMode = mode;
     const isLogin = mode === "login";
     loginTab.classList.toggle("active", isLogin);
@@ -57,10 +59,22 @@ function setAuthMode(mode) {
 }
 
 function setAuthLoading(isLoading) {
-    authSubmit.disabled = isLoading;
+    authSubmit.disabled = isLoading || confirmationSent;
     authSubmit.textContent = isLoading
         ? (authMode === "login" ? "Logging in..." : "Creating...")
         : (authMode === "login" ? "Log in" : "Create account");
+}
+
+function setConfirmationState(isSent) {
+    confirmationSent = isSent;
+    authEmail.disabled = isSent;
+    authPassword.disabled = isSent;
+    loginTab.disabled = isSent;
+    signupTab.disabled = isSent;
+    authShell.classList.toggle("confirmation-state", isSent);
+    if (isSent) {
+        authSubmit.disabled = true;
+    }
 }
 
 function getEmailRedirectUrl() {
@@ -71,6 +85,7 @@ function getEmailRedirectUrl() {
 
 async function handleAuth(event) {
     event.preventDefault();
+    if (confirmationSent) return;
     if (!supabaseClient) {
         showAuthMessage("Supabase is not configured. Check config.js.");
         return;
@@ -89,9 +104,14 @@ async function handleAuth(event) {
             showAuthMessage(result.error.message);
             return;
         }
-        if (authMode === "signup" && !result.data.session) {
-            showAuthMessage("Account created. Check your email and confirm your account before logging in.", false);
-            authForm.reset();
+        if (authMode === "signup") {
+            if (result.data.session) {
+                showAuthMessage("Account created. You are now signed in.", false);
+            } else {
+                showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Check your inbox and confirm your account before logging in.`, false);
+                authPassword.value = "";
+                setConfirmationState(true);
+            }
         }
     } catch (error) {
         showAuthMessage(`Authentication failed: ${error.message}`);
@@ -111,6 +131,7 @@ function showApp(user) {
 function showAuth() {
     currentUser = null;
     tasks = [];
+    setConfirmationState(false);
     authShell.hidden = false;
     appShell.hidden = true;
     authPassword.value = "";
