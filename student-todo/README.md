@@ -36,6 +36,16 @@ Before deployment, verify in Supabase Table Editor or SQL Editor that:
 
 If the existing table uses a different task-text column name or different priority/completion types, update the insert payload and `mapTask` in `script.js` to match that verified schema before deploying. Do not guess or broaden the policies.
 
+## Clickable confirmation email
+
+Supabase sends the confirmation email and generates the secure confirmation link. In Supabase Dashboard > Authentication > Email Templates > Confirm signup, make sure the template includes a clickable link using:
+
+```html
+<a href="{{ .ConfirmationURL }}">Confirm your email</a>
+```
+
+The app supplies the current site URL as the email redirect target. Configure that URL under Authentication > URL Configuration, and do not create or expose confirmation tokens in client-side code.
+
 ## Vercel deployment
 
 For a static Vercel deployment, make `config.js` available to the deployed site without committing it to GitHub. One simple approach is to create it as part of the deployment workflow from Vercel environment variables:

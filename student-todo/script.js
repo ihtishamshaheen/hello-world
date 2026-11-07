@@ -111,7 +111,7 @@ async function handleAuth(event) {
             if (result.data.session) {
                 showAuthMessage("Account created. You are now signed in.", false);
             } else {
-                showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Check your inbox and confirm your account before logging in.`, false);
+                showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Open it and click the confirmation link, then return here to log in.`, false);
                 authPassword.value = "";
                 setConfirmationState(true);
                 localStorage.setItem(pendingConfirmationKey, "true");
