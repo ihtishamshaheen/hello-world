@@ -50,6 +50,7 @@ function setTaskLoading(isLoading) {
 function setAuthMode(mode) {
     if (confirmationSent) return;
     authMode = mode;
+    resetPasswordVisibility();
     const isLogin = mode === "login";
     loginTab.classList.toggle("active", isLogin);
     signupTab.classList.toggle("active", !isLogin);
@@ -69,6 +70,7 @@ function setAuthLoading(isLoading) {
 
 function setConfirmationState(isSent) {
     confirmationSent = isSent;
+    if (isSent) resetPasswordVisibility();
     authEmail.disabled = isSent;
     authPassword.disabled = isSent;
     passwordToggle.disabled = isSent;
@@ -139,10 +141,14 @@ function showAuth() {
     authShell.hidden = false;
     appShell.hidden = true;
     authPassword.value = "";
+    resetPasswordVisibility();
+}
+
+function resetPasswordVisibility() {
     authPassword.type = "password";
     passwordToggle.setAttribute("aria-label", "Show password");
     passwordToggle.setAttribute("aria-pressed", "false");
-    passwordToggle.textContent = "👁̸";
+    passwordToggle.classList.remove("is-visible");
 }
 
 async function requireManualLoginAfterConfirmation() {
@@ -310,7 +316,7 @@ passwordToggle.addEventListener("click", () => {
     authPassword.type = isVisible ? "password" : "text";
     passwordToggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
     passwordToggle.setAttribute("aria-pressed", String(!isVisible));
-    passwordToggle.textContent = isVisible ? "👁̸" : "👁";
+    passwordToggle.classList.toggle("is-visible", !isVisible);
 });
 logoutButton.addEventListener("click", async () => {
     logoutButton.disabled = true;
