@@ -256,9 +256,21 @@ function setTheme(theme) {
     localStorage.setItem(themeKey, theme);
 }
 
+function updateLocalDateTime() {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "medium"
+    });
+    const taskDate = document.getElementById("taskDate");
+    taskDate.dateTime = now.toISOString();
+    taskDate.textContent = formatter.format(now);
+}
+
 async function initialize() {
     setTheme(localStorage.getItem(themeKey) || "light");
-    document.getElementById("taskDate").textContent = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date());
+    updateLocalDateTime();
+    setInterval(updateLocalDateTime, 1000);
     if (!supabaseClient) {
         configMessage.hidden = false;
         authSubmit.disabled = true;
