@@ -17,7 +17,7 @@ window.SUPABASE_CONFIG = {
 
 ## Database contract to verify
 
-The remote schema was not available in this repository, so the integration expects the existing `Tasks` table to have these columns:
+The integration expects the existing `Tasks` table to have these columns:
 
 - `id`: primary key returned by Supabase
 - `user_id`: UUID referencing `auth.users.id`
@@ -25,11 +25,13 @@ The remote schema was not available in this repository, so the integration expec
 - `priority`: text containing `low`, `medium`, or `high`
 - `completed`: boolean
 - `due_date`: nullable `date` containing the user's calendar deadline as `YYYY-MM-DD`
+- `category`: nullable text containing one of `University`, `Assignment`, `Exam Preparation`, `Personal`, `Project`, or `Other`
 
-The `due_date` column has been added to the live Supabase table with this migration:
+The `due_date` and `category` columns have been added to the live Supabase table.
+The category migration used was:
 
 ```sql
-alter table public."Tasks" add column if not exists due_date date;
+alter table public."Tasks" add column if not exists category text;
 ```
 
 No RLS policy changes were made or are required; the client continues to scope reads and writes by

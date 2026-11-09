@@ -365,7 +365,7 @@ h2 {
 
 .task-form {
     display: grid;
-    grid-template-columns: 1fr 160px 160px auto;
+    grid-template-columns: 1fr repeat(3, 150px) auto;
     gap: 10px;
     margin: 26px 0 22px;
 }
@@ -399,6 +399,26 @@ select:focus {
 
 .add-button:hover {
     background: var(--accent-dark);
+}
+
+.search-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto 190px;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.clear-search {
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+}
+
+.clear-search:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .list-toolbar {
@@ -497,6 +517,17 @@ select:focus {
 .due-overdue,
 .overdue .due-date {
     color: #b63d26;
+}
+
+.category-badge {
+    display: inline-block;
+    margin: 7px 6px 0 0;
+    padding: 3px 7px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 700;
 }
 
 .overdue {
@@ -708,6 +739,14 @@ select:focus {
     }
 
     .add-button {
+        grid-column: 1 / -1;
+    }
+
+    .search-toolbar {
+        grid-template-columns: 1fr auto;
+    }
+
+    .search-toolbar select {
         grid-column: 1 / -1;
     }
 

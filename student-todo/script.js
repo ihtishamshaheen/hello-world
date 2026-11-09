@@ -1,5 +1,6 @@
 const taskInput = document.getElementById("taskInput");
 const taskDueDate = document.getElementById("taskDueDate");
+const taskCategory = document.getElementById("taskCategory");
 const prioritySelect = document.getElementById("prioritySelect");
 const taskForm = document.getElementById("taskForm");
 const taskList = document.getElementById("taskList");
@@ -7,6 +8,9 @@ const emptyState = document.getElementById("emptyState");
 const loadingState = document.getElementById("loadingState");
 const taskMessage = document.getElementById("taskMessage");
 const taskError = document.getElementById("taskError");
+const taskSearch = document.getElementById("taskSearch");
+const clearSearch = document.getElementById("clearSearch");
+const categoryFilter = document.getElementById("categoryFilter");
 const filterButtons = document.querySelectorAll(".filter-button");
 const themeToggle = document.getElementById("themeToggle");
 const authShell = document.getElementById("authShell");
@@ -26,12 +30,15 @@ const editTaskForm = document.getElementById("editTaskForm");
 const editTaskTitle = document.getElementById("editTaskTitle");
 const editTaskDescription = document.getElementById("editTaskDescription");
 const editTaskDueDate = document.getElementById("editTaskDueDate");
+const editTaskCategory = document.getElementById("editTaskCategory");
 const editTaskPriority = document.getElementById("editTaskPriority");
 const closeEditModal = document.getElementById("closeEditModal");
 const cancelEdit = document.getElementById("cancelEdit");
 const saveEdit = document.getElementById("saveEdit");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
+let searchQuery = "";
+let selectedCategory = "all";
 let authMode = "login";
 let tasks = [];
 let currentUser = null;
@@ -219,6 +226,10 @@ function renderTasks() {
     const today = getLocalDateKey();
     const visibleTasks = tasks.filter((task) => {
         const status = getTaskStatus(task, today);
+        const searchableText = `${task.text} ${task.description}`.toLowerCase();
+        const matchesSearch = !searchQuery || searchableText.includes(searchQuery);
+        const matchesCategory = selectedCategory === "all" || task.category === selectedCategory;
+        if (!matchesSearch || !matchesCategory) return false;
         if (activeFilter === "all") return true;
         if (activeFilter === "completed") return task.completed;
         return status === activeFilter;
@@ -258,6 +269,10 @@ function renderTasks() {
                     : `Due · ${formatDueDate(task.dueDate)}`;
             content.append(dueDate);
         }
+        const category = document.createElement("span");
+        category.className = "category-badge";
+        category.textContent = task.category;
+        content.append(category);
         const priority = document.createElement("span");
         priority.className = `priority priority-${task.priority}`;
         priority.textContent = `${task.priority} priority`;
@@ -292,7 +307,13 @@ function renderTasks() {
     document.getElementById("progressBar").style.width = total ? `${completed / total * 100}%` : "0%";
     document.getElementById("listCount").textContent = `${visibleTasks.length} ${visibleTasks.length === 1 ? "task" : "tasks"}`;
     emptyState.hidden = visibleTasks.length > 0;
-    emptyState.textContent = tasks.length && activeFilter !== "all" ? `No ${activeFilter.replace("-", " ")} tasks here.` : "Your list is clear. Add a task to get started.";
+    if (visibleTasks.length === 0 && tasks.length > 0) {
+        emptyState.textContent = searchQuery || selectedCategory !== "all"
+            ? "No tasks match your search and category filters."
+            : `No ${activeFilter.replace("-", " ")} tasks here.`;
+    } else {
+        emptyState.textContent = "Your list is clear. Add a task to get started.";
+    }
 }
 
 function mapTask(task) {
@@ -301,6 +322,7 @@ function mapTask(task) {
         text: task.text,
         description: task.description || "",
         dueDate: task.due_date || "",
+        category: task.category || "Other",
         priority: task.priority || "medium",
         completed: Boolean(task.completed)
     };
@@ -331,6 +353,7 @@ async function addTask(event) {
         text: taskText,
         priority: prioritySelect.value,
         due_date: taskDueDate.value || null,
+        category: taskCategory.value,
         completed: false,
         user_id: currentUser.id
     }).select().single();
@@ -368,6 +391,7 @@ function openEditModal(task) {
     editTaskTitle.value = task.text;
     editTaskDescription.value = task.description;
     editTaskDueDate.value = task.dueDate;
+    editTaskCategory.value = task.category;
     editTaskPriority.value = task.priority;
     editModal.hidden = false;
     document.body.classList.add("modal-open");
@@ -402,6 +426,7 @@ async function saveEditedTask(event) {
                 text,
                 description: editTaskDescription.value.trim(),
                 due_date: editTaskDueDate.value || null,
+                category: editTaskCategory.value,
                 priority: editTaskPriority.value
             })
             .eq("id", editingTask.id)
@@ -503,6 +528,22 @@ filterButtons.forEach((button) => button.addEventListener("click", () => {
     filterButtons.forEach((item) => item.classList.toggle("active", item === button));
     renderTasks();
 }));
+taskSearch.addEventListener("input", () => {
+    searchQuery = taskSearch.value.trim().toLowerCase();
+    clearSearch.hidden = !searchQuery;
+    renderTasks();
+});
+clearSearch.addEventListener("click", () => {
+    taskSearch.value = "";
+    searchQuery = "";
+    clearSearch.hidden = true;
+    taskSearch.focus();
+    renderTasks();
+});
+categoryFilter.addEventListener("change", () => {
+    selectedCategory = categoryFilter.value;
+    renderTasks();
+});
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
 setInterval(() => {
     if (currentUser) renderTasks();
