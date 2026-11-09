@@ -104,9 +104,39 @@
             <ul id="taskList" aria-live="polite"></ul>
             <p class="empty-state" id="emptyState">Your list is clear. Add a task to get started.</p>
             <p class="loading-state" id="loadingState" hidden>Loading your tasks...</p>
+            <p class="task-message" id="taskMessage" role="status" aria-live="polite" hidden></p>
             <p class="error-state" id="taskError" role="alert" hidden></p>
         </section>
     </main>
+
+    <div class="modal-backdrop" id="editModal" hidden>
+        <section class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+            <div class="modal-heading">
+                <div>
+                    <span class="section-label">TASK DETAILS</span>
+                    <h2 id="editModalTitle">Edit task</h2>
+                </div>
+                <button class="modal-close" id="closeEditModal" type="button" aria-label="Close edit task dialog">&times;</button>
+            </div>
+            <form id="editTaskForm">
+                <label for="editTaskTitle">Title</label>
+                <input id="editTaskTitle" type="text" maxlength="120" required>
+                <label for="editTaskDescription">Description</label>
+                <textarea id="editTaskDescription" rows="4" maxlength="1000"
+                    placeholder="Add a little more detail"></textarea>
+                <label for="editTaskPriority">Priority</label>
+                <select id="editTaskPriority">
+                    <option value="low">Low priority</option>
+                    <option value="medium">Medium priority</option>
+                    <option value="high">High priority</option>
+                </select>
+                <div class="modal-actions">
+                    <button class="modal-cancel" id="cancelEdit" type="button">Cancel</button>
+                    <button class="add-button" id="saveEdit" type="submit">Save changes</button>
+                </div>
+            </form>
+        </section>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>

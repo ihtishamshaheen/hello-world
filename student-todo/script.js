@@ -4,6 +4,7 @@ const taskForm = document.getElementById("taskForm");
 const taskList = document.getElementById("taskList");
 const emptyState = document.getElementById("emptyState");
 const loadingState = document.getElementById("loadingState");
+const taskMessage = document.getElementById("taskMessage");
 const taskError = document.getElementById("taskError");
 const filterButtons = document.querySelectorAll(".filter-button");
 const themeToggle = document.getElementById("themeToggle");
@@ -19,13 +20,22 @@ const configMessage = document.getElementById("configMessage");
 const loginTab = document.getElementById("loginTab");
 const signupTab = document.getElementById("signupTab");
 const logoutButton = document.getElementById("logoutButton");
+const editModal = document.getElementById("editModal");
+const editTaskForm = document.getElementById("editTaskForm");
+const editTaskTitle = document.getElementById("editTaskTitle");
+const editTaskDescription = document.getElementById("editTaskDescription");
+const editTaskPriority = document.getElementById("editTaskPriority");
+const closeEditModal = document.getElementById("closeEditModal");
+const cancelEdit = document.getElementById("cancelEdit");
+const saveEdit = document.getElementById("saveEdit");
 const themeKey = "studentTodoTheme";
-const pendingConfirmationKey = "studentTodoPendingConfirmation";
 let activeFilter = "all";
 let authMode = "login";
 let tasks = [];
 let currentUser = null;
 let confirmationSent = false;
+let confirmationRedirectInProgress = false;
+let editingTask = null;
 
 const config = window.SUPABASE_CONFIG;
 const supabaseClient = config?.url && config?.publishableKey && window.supabase
@@ -40,6 +50,11 @@ function showAuthMessage(message = "", isError = true) {
 function showTaskError(message = "") {
     taskError.textContent = message;
     taskError.hidden = !message;
+}
+
+function showTaskMessage(message = "") {
+    taskMessage.textContent = message;
+    taskMessage.hidden = !message;
 }
 
 function setTaskLoading(isLoading) {
@@ -77,9 +92,7 @@ function setConfirmationState(isSent) {
     loginTab.disabled = isSent;
     signupTab.disabled = isSent;
     authShell.classList.toggle("confirmation-state", isSent);
-    if (isSent) {
-        authSubmit.disabled = true;
-    }
+    authSubmit.disabled = isSent;
 }
 
 function getEmailRedirectUrl() {
@@ -91,12 +104,12 @@ function getEmailRedirectUrl() {
 async function handleAuth(event) {
     event.preventDefault();
     if (confirmationSent) return;
+    showAuthMessage();
     if (!supabaseClient) {
         showAuthMessage("Supabase is not configured. Check config.js.");
         return;
     }
     setAuthLoading(true);
-    showAuthMessage();
     try {
         const result = authMode === "login"
             ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
@@ -116,7 +129,6 @@ async function handleAuth(event) {
                 showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Open it and click the confirmation link, then return here to log in.`, false);
                 authPassword.value = "";
                 setConfirmationState(true);
-                localStorage.setItem(pendingConfirmationKey, "true");
             }
         }
     } catch (error) {
@@ -138,10 +150,12 @@ function showAuth() {
     currentUser = null;
     tasks = [];
     setConfirmationState(false);
+    setAuthMode("login");
     authShell.hidden = false;
     appShell.hidden = true;
     authPassword.value = "";
     resetPasswordVisibility();
+    setAuthLoading(false);
 }
 
 function resetPasswordVisibility() {
@@ -151,12 +165,30 @@ function resetPasswordVisibility() {
     passwordToggle.classList.remove("is-visible");
 }
 
+function isEmailConfirmationRedirect() {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const searchParams = new URLSearchParams(window.location.search);
+    return hashParams.get("type") === "signup" || searchParams.get("type") === "signup";
+}
+
+function clearEmailConfirmationRedirect() {
+    const url = new URL(window.location.href);
+    url.hash = "";
+    url.searchParams.delete("code");
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+}
+
 async function requireManualLoginAfterConfirmation() {
-    localStorage.removeItem(pendingConfirmationKey);
-    const { error } = await supabaseClient.auth.signOut();
-    if (error) throw error;
-    showAuth();
-    showAuthMessage("Email confirmed. Please enter your email and password to log in.", false);
+    confirmationRedirectInProgress = true;
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        clearEmailConfirmationRedirect();
+        showAuth();
+        showAuthMessage("Email confirmed. Please enter your email and password to log in.", false);
+    } finally {
+        confirmationRedirectInProgress = false;
+    }
 }
 
 function renderTasks() {
@@ -177,10 +209,23 @@ function renderTasks() {
         const label = document.createElement("span");
         label.className = "task-label";
         label.textContent = task.text;
+        if (task.description) {
+            const description = document.createElement("span");
+            description.className = "task-description";
+            description.textContent = task.description;
+            content.append(description);
+        }
         const priority = document.createElement("span");
         priority.className = `priority priority-${task.priority}`;
         priority.textContent = `${task.priority} priority`;
         content.append(label, priority);
+
+        const editButton = document.createElement("button");
+        editButton.className = "edit-button";
+        editButton.type = "button";
+        editButton.setAttribute("aria-label", `Edit ${task.text}`);
+        editButton.textContent = "Edit";
+        editButton.addEventListener("click", () => openEditModal(task));
 
         const deleteButton = document.createElement("button");
         deleteButton.className = "delete-button";
@@ -188,7 +233,10 @@ function renderTasks() {
         deleteButton.setAttribute("aria-label", `Delete ${task.text}`);
         deleteButton.textContent = "Delete";
         deleteButton.addEventListener("click", () => deleteTask(task.id));
-        taskItem.append(toggle, content, deleteButton);
+        const taskActions = document.createElement("div");
+        taskActions.className = "task-actions";
+        taskActions.append(editButton, deleteButton);
+        taskItem.append(toggle, content, taskActions);
         taskList.appendChild(taskItem);
     });
 
@@ -205,7 +253,13 @@ function renderTasks() {
 }
 
 function mapTask(task) {
-    return { id: task.id, text: task.text, priority: task.priority || "medium", completed: Boolean(task.completed) };
+    return {
+        id: task.id,
+        text: task.text,
+        description: task.description || "",
+        priority: task.priority || "medium",
+        completed: Boolean(task.completed)
+    };
 }
 
 async function loadTasks() {
@@ -228,6 +282,7 @@ async function addTask(event) {
     if (!taskText || !currentUser) { taskInput.focus(); return; }
     setTaskLoading(true);
     showTaskError();
+    showTaskMessage();
     const { data, error } = await supabaseClient.from("Tasks").insert({ text: taskText, priority: prioritySelect.value, completed: false, user_id: currentUser.id }).select().single();
     setTaskLoading(false);
     if (error) {
@@ -242,6 +297,7 @@ async function addTask(event) {
 
 async function toggleTask(id, completed) {
     showTaskError();
+    showTaskMessage();
     const { error } = await supabaseClient.from("Tasks").update({ completed: !completed }).eq("id", id).eq("user_id", currentUser.id);
     if (error) { showTaskError(`Could not update task: ${error.message}`); return; }
     tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
@@ -250,10 +306,71 @@ async function toggleTask(id, completed) {
 
 async function deleteTask(id) {
     showTaskError();
+    showTaskMessage();
     const { error } = await supabaseClient.from("Tasks").delete().eq("id", id).eq("user_id", currentUser.id);
     if (error) { showTaskError(`Could not delete task: ${error.message}`); return; }
     tasks = tasks.filter((task) => task.id !== id);
     renderTasks();
+}
+
+function openEditModal(task) {
+    editingTask = task;
+    editTaskTitle.value = task.text;
+    editTaskDescription.value = task.description;
+    editTaskPriority.value = task.priority;
+    editModal.hidden = false;
+    document.body.classList.add("modal-open");
+    editTaskTitle.focus();
+}
+
+function closeEditDialog() {
+    editModal.hidden = true;
+    document.body.classList.remove("modal-open");
+    editingTask = null;
+    editTaskForm.reset();
+}
+
+async function saveEditedTask(event) {
+    event.preventDefault();
+    if (!editingTask || !currentUser) return;
+    const text = editTaskTitle.value.trim();
+    if (!text) {
+        editTaskTitle.focus();
+        return;
+    }
+
+    saveEdit.disabled = true;
+    showTaskError();
+    showTaskMessage();
+    let data;
+    let error;
+    try {
+        ({ data, error } = await supabaseClient
+            .from("Tasks")
+            .update({
+                text,
+                description: editTaskDescription.value.trim(),
+                priority: editTaskPriority.value
+            })
+            .eq("id", editingTask.id)
+            .eq("user_id", currentUser.id)
+            .select()
+            .single());
+    } catch (requestError) {
+        showTaskError(`Could not update task: ${requestError.message}`);
+        return;
+    } finally {
+        saveEdit.disabled = false;
+    }
+
+    if (error) {
+        showTaskError(`Could not update task: ${error.message}`);
+        return;
+    }
+    tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
+    closeEditDialog();
+    renderTasks();
+    showTaskMessage("Task updated successfully.");
 }
 
 function setTheme(theme) {
@@ -284,22 +401,21 @@ async function initialize() {
         return;
     }
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session?.user && localStorage.getItem(pendingConfirmationKey) === "true") {
-        await requireManualLoginAfterConfirmation();
+    if (session?.user && isEmailConfirmationRedirect()) {
+        try {
+            await requireManualLoginAfterConfirmation();
+        } catch (error) {
+            showAuth();
+            showAuthMessage(`Could not prepare the login screen: ${error.message}`);
+        }
     } else if (session?.user) {
         showApp(session.user);
     } else {
         showAuth();
     }
     supabaseClient.auth.onAuthStateChange((_event, sessionState) => {
-        if (sessionState?.user && localStorage.getItem(pendingConfirmationKey) === "true") {
-            setTimeout(() => {
-                requireManualLoginAfterConfirmation().catch((error) => {
-                    showAuth();
-                    showAuthMessage(`Could not prepare the login screen: ${error.message}`);
-                });
-            }, 0);
-        } else if (sessionState?.user) {
+        if (confirmationRedirectInProgress) return;
+        if (sessionState?.user) {
             showApp(sessionState.user);
         } else {
             showAuth();
@@ -308,6 +424,7 @@ async function initialize() {
 }
 
 taskForm.addEventListener("submit", addTask);
+editTaskForm.addEventListener("submit", saveEditedTask);
 authForm.addEventListener("submit", handleAuth);
 loginTab.addEventListener("click", () => setAuthMode("login"));
 signupTab.addEventListener("click", () => setAuthMode("signup"));
@@ -335,4 +452,9 @@ filterButtons.forEach((button) => button.addEventListener("click", () => {
     renderTasks();
 }));
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
+closeEditModal.addEventListener("click", closeEditDialog);
+cancelEdit.addEventListener("click", closeEditDialog);
+editModal.addEventListener("click", (event) => {
+    if (event.target === editModal) closeEditDialog();
+});
 initialize();
