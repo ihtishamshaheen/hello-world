@@ -76,6 +76,7 @@
         <nav class="view-tabs" aria-label="Study desk views">
             <button class="view-tab active" id="tasksViewTab" type="button" aria-selected="true">Task list</button>
             <button class="view-tab" id="plannerViewTab" type="button" aria-selected="false">Study planner</button>
+            <button class="view-tab" id="focusViewTab" type="button" aria-selected="false">Focus timer</button>
         </nav>
 
         <section class="task-panel" aria-labelledby="tasks-heading">
@@ -165,6 +166,48 @@
                 </div>
                 <ul class="agenda-list" id="agendaList"></ul>
                 <p class="empty-state" id="agendaEmpty">No tasks scheduled for this day.</p>
+            </div>
+        </section>
+
+        <section class="focus-panel" id="focusPanel" aria-labelledby="focus-heading" hidden>
+            <div class="focus-heading">
+                <div>
+                    <span class="section-label">DEEP WORK</span>
+                    <h2 id="focus-heading">Pomodoro focus timer</h2>
+                    <p class="focus-task" id="focusTaskLabel">Choose a task to begin.</p>
+                </div>
+                <div class="focus-count">
+                    <strong id="focusSessionCount">0</strong>
+                    <span>focus sessions</span>
+                </div>
+            </div>
+            <div class="focus-layout">
+                <div class="timer-card">
+                    <div class="timer-ring" id="timerRing">
+                        <div class="timer-display">
+                            <strong id="timerDisplay">25:00</strong>
+                            <span id="timerModeLabel">Focus</span>
+                        </div>
+                    </div>
+                    <div class="timer-controls">
+                        <button class="add-button" id="timerStart" type="button">Start</button>
+                        <button class="calendar-button" id="timerPause" type="button" disabled>Pause</button>
+                        <button class="calendar-button" id="timerReset" type="button">Reset</button>
+                    </div>
+                </div>
+                <form class="focus-settings" id="focusSettings">
+                    <label for="focusTaskSelect">Focus task</label>
+                    <select id="focusTaskSelect">
+                        <option value="">No task selected</option>
+                    </select>
+                    <label for="focusDuration">Focus minutes</label>
+                    <input id="focusDuration" type="number" min="1" max="120" value="25" required>
+                    <label for="shortBreakDuration">Short break minutes</label>
+                    <input id="shortBreakDuration" type="number" min="1" max="60" value="5" required>
+                    <label for="longBreakDuration">Long break minutes</label>
+                    <input id="longBreakDuration" type="number" min="1" max="120" value="15" required>
+                    <button class="calendar-button" type="submit">Apply durations</button>
+                </form>
             </div>
         </section>
     </main>

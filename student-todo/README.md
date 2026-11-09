@@ -37,6 +37,36 @@ alter table public."Tasks" add column if not exists category text;
 No RLS policy changes were made or are required; the client continues to scope reads and writes by
 `user_id`, and existing policies should continue to enforce ownership.
 
+## Focus session persistence
+
+The Pomodoro timer stores completed focus sessions in a separate `FocusSessions` table.
+Create it once in Supabase SQL Editor, then enable RLS and add policies that restrict
+all operations to `auth.uid() = user_id`:
+
+```sql
+create table if not exists public."FocusSessions" (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    task_id text,
+    duration_minutes integer not null,
+    completed_at timestamptz not null default now()
+);
+
+alter table public."FocusSessions" enable row level security;
+
+create policy "Users can view their own focus sessions"
+on public."FocusSessions" for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can create their own focus sessions"
+on public."FocusSessions" for insert
+to authenticated
+with check (auth.uid() = user_id);
+```
+
+No existing authentication or `Tasks` RLS policies need to change.
+
 The client sends `user_id` from the authenticated session and also filters every read, update, and delete by `user_id`. It never disables or bypasses RLS.
 
 Before deployment, verify in Supabase Table Editor or SQL Editor that:

@@ -48,6 +48,21 @@ const agendaTitle = document.getElementById("agendaTitle");
 const agendaList = document.getElementById("agendaList");
 const agendaEmpty = document.getElementById("agendaEmpty");
 const addForDate = document.getElementById("addForDate");
+const focusViewTab = document.getElementById("focusViewTab");
+const focusPanel = document.getElementById("focusPanel");
+const focusTaskLabel = document.getElementById("focusTaskLabel");
+const focusSessionCount = document.getElementById("focusSessionCount");
+const timerRing = document.getElementById("timerRing");
+const timerDisplay = document.getElementById("timerDisplay");
+const timerModeLabel = document.getElementById("timerModeLabel");
+const timerStart = document.getElementById("timerStart");
+const timerPause = document.getElementById("timerPause");
+const timerReset = document.getElementById("timerReset");
+const focusSettings = document.getElementById("focusSettings");
+const focusTaskSelect = document.getElementById("focusTaskSelect");
+const focusDuration = document.getElementById("focusDuration");
+const shortBreakDuration = document.getElementById("shortBreakDuration");
+const longBreakDuration = document.getElementById("longBreakDuration");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
 let searchQuery = "";
@@ -62,6 +77,12 @@ let calendarWeekOffset = 0;
 let selectedCalendarDate = getLocalDateKey();
 let activeView = "tasks";
 const activeToasts = new Set();
+let focusMode = "focus";
+let focusSecondsRemaining = 25 * 60;
+let focusTotalSeconds = 25 * 60;
+let focusTimerId = null;
+let focusSessionTotal = 0;
+let completedFocusSessions = 0;
 
 function getLocalDateKey(date = new Date()) {
     const year = date.getFullYear();
@@ -113,13 +134,161 @@ function formatWeekLabel(dates) {
 function setActiveView(view) {
     activeView = view;
     const showPlanner = view === "planner";
-    taskPanel.hidden = showPlanner;
+    const showFocus = view === "focus";
+    taskPanel.hidden = showPlanner || showFocus;
     plannerPanel.hidden = !showPlanner;
-    tasksViewTab.classList.toggle("active", !showPlanner);
+    focusPanel.hidden = !showFocus;
+    tasksViewTab.classList.toggle("active", view === "tasks");
     plannerViewTab.classList.toggle("active", showPlanner);
-    tasksViewTab.setAttribute("aria-selected", String(!showPlanner));
+    focusViewTab.classList.toggle("active", showFocus);
+    tasksViewTab.setAttribute("aria-selected", String(view === "tasks"));
     plannerViewTab.setAttribute("aria-selected", String(showPlanner));
+    focusViewTab.setAttribute("aria-selected", String(showFocus));
     if (showPlanner) renderPlanner();
+    if (showFocus) renderFocusTaskOptions();
+}
+
+function getFocusDurationSeconds() {
+    return Math.max(1, Number(focusDuration.value) || 25) * 60;
+}
+
+function getShortBreakSeconds() {
+    return Math.max(1, Number(shortBreakDuration.value) || 5) * 60;
+}
+
+function getLongBreakSeconds() {
+    return Math.max(1, Number(longBreakDuration.value) || 15) * 60;
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(focusSecondsRemaining / 60);
+    const seconds = focusSecondsRemaining % 60;
+    timerDisplay.textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    timerModeLabel.textContent = focusMode === "focus" ? "Focus" : focusMode === "short-break" ? "Short break" : "Long break";
+    const progress = focusTotalSeconds ? (focusTotalSeconds - focusSecondsRemaining) / focusTotalSeconds : 0;
+    timerRing.style.setProperty("--timer-progress", `${progress * 360}deg`);
+}
+
+function setFocusMode(mode, durationSeconds) {
+    focusMode = mode;
+    focusTotalSeconds = durationSeconds;
+    focusSecondsRemaining = durationSeconds;
+    updateTimerDisplay();
+}
+
+function renderFocusTaskOptions() {
+    const selectedTaskId = focusTaskSelect.value;
+    focusTaskSelect.innerHTML = '<option value="">No task selected</option>';
+    tasks.filter((task) => !task.completed).forEach((task) => {
+        const option = document.createElement("option");
+        option.value = task.id;
+        option.textContent = task.text;
+        focusTaskSelect.appendChild(option);
+    });
+    if (tasks.some((task) => String(task.id) === selectedTaskId && !task.completed)) {
+        focusTaskSelect.value = selectedTaskId;
+    }
+    updateFocusTaskLabel();
+}
+
+function updateFocusTaskLabel() {
+    const task = tasks.find((item) => String(item.id) === focusTaskSelect.value);
+    focusTaskLabel.textContent = task ? `Focusing on: ${task.text}` : "Choose a task to begin.";
+}
+
+async function loadFocusSessionCount() {
+    if (!currentUser) return;
+    try {
+        const { count, error } = await supabaseClient
+            .from("FocusSessions")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", currentUser.id);
+        if (error) throw error;
+        completedFocusSessions = count || 0;
+        focusSessionCount.textContent = completedFocusSessions;
+    } catch (error) {
+        showToast(`Could not load focus sessions: ${error.message}`, "error");
+    }
+}
+
+async function saveCompletedFocusSession() {
+    if (!currentUser) return;
+    const { error } = await supabaseClient.from("FocusSessions").insert({
+        user_id: currentUser.id,
+        task_id: focusTaskSelect.value || null,
+        duration_minutes: Math.max(1, Number(focusDuration.value) || 25)
+    });
+    if (error) throw error;
+    completedFocusSessions += 1;
+    focusSessionCount.textContent = completedFocusSessions;
+}
+
+async function finishTimerSession() {
+    focusTimerId = null;
+    timerPause.disabled = true;
+    if (focusMode === "focus") {
+        try {
+            await saveCompletedFocusSession();
+            showToast("Focus session complete. Great work!");
+        } catch (error) {
+            showToast(`Focus session finished, but could not save it: ${error.message}`, "error");
+        }
+        const nextMode = completedFocusSessions > 0 && completedFocusSessions % 4 === 0 ? "long-break" : "short-break";
+        setFocusMode(nextMode, nextMode === "long-break" ? getLongBreakSeconds() : getShortBreakSeconds());
+    } else {
+        showToast("Break finished. Ready for another focus session.");
+        setFocusMode("focus", getFocusDurationSeconds());
+    }
+    timerStart.textContent = "Start";
+}
+
+function runFocusTimer() {
+    if (focusTimerId) return;
+    let lastTick = Date.now();
+    timerStart.textContent = "Running";
+    timerStart.disabled = true;
+    timerPause.disabled = false;
+    focusTimerId = window.setInterval(() => {
+        const now = Date.now();
+        const elapsedSeconds = Math.floor((now - lastTick) / 1000);
+        if (elapsedSeconds < 1) return;
+        lastTick += elapsedSeconds * 1000;
+        focusSecondsRemaining = Math.max(0, focusSecondsRemaining - elapsedSeconds);
+        updateTimerDisplay();
+        if (focusSecondsRemaining === 0) {
+            window.clearInterval(focusTimerId);
+            timerStart.disabled = false;
+            finishTimerSession();
+        }
+    }, 250);
+}
+
+function pauseFocusTimer() {
+    if (!focusTimerId) return;
+    window.clearInterval(focusTimerId);
+    focusTimerId = null;
+    timerStart.disabled = false;
+    timerStart.textContent = "Resume";
+    timerPause.disabled = true;
+}
+
+function resetFocusTimer() {
+    if (focusTimerId) window.clearInterval(focusTimerId);
+    focusTimerId = null;
+    timerStart.disabled = false;
+    timerStart.textContent = "Start";
+    timerPause.disabled = true;
+    setFocusMode("focus", getFocusDurationSeconds());
+}
+
+function applyFocusDurations(event) {
+    event.preventDefault();
+    if (focusTimerId) {
+        showToast("Pause or reset the timer before changing durations.", "warning");
+        return;
+    }
+    resetFocusTimer();
+    showToast("Timer durations updated.");
 }
 
 function createCalendarTaskEntry(task) {
@@ -344,6 +513,9 @@ function showApp(user) {
 function showAuth() {
     currentUser = null;
     tasks = [];
+    resetFocusTimer();
+    completedFocusSessions = 0;
+    focusSessionCount.textContent = "0";
     setConfirmationState(false);
     setAuthMode("login");
     authShell.hidden = false;
@@ -506,7 +678,9 @@ async function loadTasks() {
         }
         tasks = data.map(mapTask);
         renderTasks();
+        renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
+        loadFocusSessionCount();
     } catch (error) {
         showTaskError(`Could not load tasks: ${error.message}`);
         showToast(`Could not load tasks: ${error.message}`, "error");
@@ -538,6 +712,7 @@ async function addTask(event) {
         }
         tasks.unshift(mapTask(data));
         renderTasks();
+        renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         taskForm.reset();
         taskInput.focus();
@@ -562,6 +737,7 @@ async function toggleTask(id, completed) {
         }
         tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
         renderTasks();
+        renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         showToast(completed ? "Task marked incomplete." : "Task marked completed.");
     } catch (error) {
@@ -582,6 +758,7 @@ async function deleteTask(id) {
         }
         tasks = tasks.filter((task) => task.id !== id);
         renderTasks();
+        renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         showToast("Task deleted successfully.");
     } catch (error) {
@@ -653,6 +830,7 @@ async function saveEditedTask(event) {
     tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
     closeEditDialog();
     renderTasks();
+    renderFocusTaskOptions();
     if (activeView === "planner") renderPlanner();
     showTaskMessage("Task updated successfully.");
     showToast("Task updated successfully.");
@@ -761,6 +939,7 @@ categoryFilter.addEventListener("change", () => {
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
 tasksViewTab.addEventListener("click", () => setActiveView("tasks"));
 plannerViewTab.addEventListener("click", () => setActiveView("planner"));
+focusViewTab.addEventListener("click", () => setActiveView("focus"));
 previousWeek.addEventListener("click", () => {
     calendarWeekOffset -= 1;
     selectedCalendarDate = getWeekDates()[0];
@@ -777,6 +956,11 @@ addForDate.addEventListener("click", () => {
     taskInput.focus();
     showToast(`New task due ${formatDueDate(selectedCalendarDate)}.`);
 });
+timerStart.addEventListener("click", runFocusTimer);
+timerPause.addEventListener("click", pauseFocusTimer);
+timerReset.addEventListener("click", resetFocusTimer);
+focusSettings.addEventListener("submit", applyFocusDurations);
+focusTaskSelect.addEventListener("change", updateFocusTaskLabel);
 setInterval(() => {
     if (currentUser) renderTasks();
 }, 60000);
