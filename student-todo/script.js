@@ -85,6 +85,18 @@ const currentStreak = document.getElementById("currentStreak");
 const longestStreak = document.getElementById("longestStreak");
 const streakMessage = document.getElementById("streakMessage");
 const activityDays = document.getElementById("activityDays");
+const dashboardHeading = document.getElementById("dashboard-heading");
+const dashboardDate = document.getElementById("dashboardDate");
+const quickAddTask = document.getElementById("quickAddTask");
+const dashboardOverdueCount = document.getElementById("dashboardOverdueCount");
+const dashboardStreakCount = document.getElementById("dashboardStreakCount");
+const todayTaskList = document.getElementById("todayTaskList");
+const todayTaskCount = document.getElementById("todayTaskCount");
+const todayTaskEmpty = document.getElementById("todayTaskEmpty");
+const upcomingTaskList = document.getElementById("upcomingTaskList");
+const upcomingTaskCount = document.getElementById("upcomingTaskCount");
+const upcomingTaskEmpty = document.getElementById("upcomingTaskEmpty");
+const miniProductivityChart = document.getElementById("miniProductivityChart");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
 let searchQuery = "";
@@ -191,6 +203,7 @@ function renderStudyStreak() {
     const streaks = calculateStreaks(studyActivityDates);
     currentStreak.textContent = streaks.current;
     longestStreak.textContent = streaks.longest;
+    dashboardStreakCount.textContent = streaks.current;
     streakMessage.textContent = streaks.current > 0
         ? (streaks.current >= 3 ? "You are building a strong study habit." : "Keep going to grow your streak.")
         : "Complete a task or focus session to start your streak.";
@@ -209,6 +222,78 @@ function renderStudyStreak() {
         day.append(label, marker);
         activityDays.appendChild(day);
     });
+}
+
+function getGreeting(hour = new Date().getHours()) {
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+}
+
+function updateDashboardDate() {
+    const now = new Date();
+    dashboardHeading.textContent = getGreeting(now.getHours());
+    dashboardDate.textContent = new Intl.DateTimeFormat(undefined, {
+        weekday: "long", month: "long", day: "numeric", year: "numeric"
+    }).format(now);
+}
+
+function createDashboardTaskItem(task) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.className = `dashboard-task-item${task.completed ? " dashboard-task-complete" : ""}`;
+    button.type = "button";
+    button.addEventListener("click", () => openEditModal(task));
+    const title = document.createElement("strong");
+    title.textContent = task.text;
+    const meta = document.createElement("span");
+    meta.textContent = task.dueDate ? formatDueDate(task.dueDate) : "No due date";
+    const priority = document.createElement("em");
+    priority.className = `priority priority-${task.priority}`;
+    priority.textContent = task.priority;
+    button.append(title, meta, priority);
+    item.appendChild(button);
+    return item;
+}
+
+function renderMiniProductivityChart() {
+    const weekDates = getCurrentWeekDates();
+    const counts = weekDates.map((date) => tasks.filter((task) =>
+        task.completed && getTaskAnalyticsDate(task) === date
+    ).length);
+    const maximum = Math.max(...counts, 1);
+    miniProductivityChart.replaceChildren();
+    weekDates.forEach((date, index) => {
+        const bar = document.createElement("div");
+        bar.className = "mini-chart-bar";
+        const fill = document.createElement("span");
+        fill.style.height = `${Math.max(8, counts[index] / maximum * 100)}%`;
+        fill.title = `${counts[index]} completed`;
+        const label = document.createElement("small");
+        label.textContent = new Intl.DateTimeFormat(undefined, { weekday: "narrow" })
+            .format(parseLocalDate(date));
+        bar.append(fill, label);
+        miniProductivityChart.appendChild(bar);
+    });
+}
+
+function renderDashboardSections() {
+    updateDashboardDate();
+    const today = getLocalDateKey();
+    const todayTasks = tasks.filter((task) => task.dueDate === today);
+    const upcomingTasks = tasks
+        .filter((task) => !task.completed && task.dueDate > today)
+        .sort((first, second) => first.dueDate.localeCompare(second.dueDate))
+        .slice(0, 5);
+    todayTaskList.replaceChildren();
+    upcomingTaskList.replaceChildren();
+    todayTasks.forEach((task) => todayTaskList.appendChild(createDashboardTaskItem(task)));
+    upcomingTasks.forEach((task) => upcomingTaskList.appendChild(createDashboardTaskItem(task)));
+    todayTaskCount.textContent = todayTasks.length;
+    upcomingTaskCount.textContent = upcomingTasks.length;
+    todayTaskEmpty.hidden = todayTasks.length > 0;
+    upcomingTaskEmpty.hidden = upcomingTasks.length > 0;
+    renderMiniProductivityChart();
 }
 
 function getAnalyticsRange() {
@@ -1036,9 +1121,11 @@ function renderTasks() {
 
     const completed = tasks.filter((task) => task.completed).length;
     const total = tasks.length;
+    const overdue = tasks.filter((task) => getTaskStatus(task) === "overdue").length;
     document.getElementById("totalCount").textContent = total;
     document.getElementById("activeCount").textContent = total - completed;
     document.getElementById("completedCount").textContent = completed;
+    dashboardOverdueCount.textContent = overdue;
     document.getElementById("progressText").textContent = `${completed} of ${total} complete`;
     document.getElementById("progressBar").style.width = total ? `${completed / total * 100}%` : "0%";
     document.getElementById("listCount").textContent = `${visibleTasks.length} ${visibleTasks.length === 1 ? "task" : "tasks"}`;
@@ -1050,6 +1137,7 @@ function renderTasks() {
     } else {
         emptyState.textContent = "Your list is clear. Add a task to get started.";
     }
+    renderDashboardSections();
 }
 
 function mapTask(task) {
@@ -1281,8 +1369,10 @@ function updateLocalDateTime() {
 
 async function initialize() {
     setTheme(localStorage.getItem(themeKey) || "light");
+    updateDashboardDate();
     updateLocalDateTime();
     setInterval(updateLocalDateTime, 1000);
+    setInterval(updateDashboardDate, 60000);
     if (!supabaseClient) {
         configMessage.hidden = false;
         authSubmit.disabled = true;
@@ -1362,6 +1452,11 @@ categoryFilter.addEventListener("change", () => {
     renderTasks();
 });
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
+quickAddTask.addEventListener("click", () => {
+    setActiveView("tasks");
+    taskInput.focus();
+    taskInput.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 tasksViewTab.addEventListener("click", () => setActiveView("tasks"));
 plannerViewTab.addEventListener("click", () => setActiveView("planner"));
 focusViewTab.addEventListener("click", () => setActiveView("focus"));

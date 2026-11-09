@@ -62,15 +62,42 @@
             </div>
         </header>
 
-        <section class="dashboard" aria-label="Task progress">
-            <div class="progress-copy">
-                <span class="section-label">TODAY'S PROGRESS</span>
-                <strong id="progressText">0 of 0 complete</strong>
+        <section class="dashboard-overview" aria-labelledby="dashboard-heading">
+            <div class="dashboard-welcome">
+                <div>
+                    <span class="section-label">STUDENT PRODUCTIVITY DASHBOARD</span>
+                    <h2 id="dashboard-heading">Good morning</h2>
+                    <p class="dashboard-date" id="dashboardDate"></p>
+                </div>
+                <button class="add-button quick-add-button" id="quickAddTask" type="button">+ Quick add task</button>
+            </div>
+            <div class="dashboard-stats" aria-label="Task statistics">
+                <div class="dashboard-stat stat-total"><span class="dashboard-stat-icon">◎</span><div><strong id="totalCount">0</strong><small>Total tasks</small></div></div>
+                <div class="dashboard-stat stat-completed"><span class="dashboard-stat-icon">✓</span><div><strong id="completedCount">0</strong><small>Completed</small></div></div>
+                <div class="dashboard-stat stat-pending"><span class="dashboard-stat-icon">○</span><div><strong id="activeCount">0</strong><small>Pending</small></div></div>
+                <div class="dashboard-stat stat-overdue"><span class="dashboard-stat-icon">!</span><div><strong id="dashboardOverdueCount">0</strong><small>Overdue</small></div></div>
+                <div class="dashboard-stat stat-streak"><span class="dashboard-stat-icon">✦</span><div><strong id="dashboardStreakCount">0</strong><small>Study streak</small></div></div>
+            </div>
+            <div class="dashboard-progress">
+                <div><span class="section-label">TODAY'S PROGRESS</span><strong id="progressText">0 of 0 complete</strong></div>
                 <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
             </div>
-            <div class="stat"><span id="totalCount">0</span><small>Total</small></div>
-            <div class="stat"><span id="activeCount">0</span><small>Active</small></div>
-            <div class="stat"><span id="completedCount">0</span><small>Done</small></div>
+            <div class="dashboard-lower">
+                <section class="dashboard-task-card" aria-labelledby="today-tasks-heading">
+                    <div class="dashboard-card-heading"><div><span class="section-label">FOCUS TODAY</span><h3 id="today-tasks-heading">Today's tasks</h3></div><span class="dashboard-card-count" id="todayTaskCount">0</span></div>
+                    <ul class="dashboard-task-list" id="todayTaskList"></ul>
+                    <p class="dashboard-empty" id="todayTaskEmpty">No tasks due today.</p>
+                </section>
+                <section class="dashboard-task-card" aria-labelledby="upcoming-heading">
+                    <div class="dashboard-card-heading"><div><span class="section-label">PLAN AHEAD</span><h3 id="upcoming-heading">Upcoming deadlines</h3></div><span class="dashboard-card-count" id="upcomingTaskCount">0</span></div>
+                    <ul class="dashboard-task-list" id="upcomingTaskList"></ul>
+                    <p class="dashboard-empty" id="upcomingTaskEmpty">No upcoming deadlines.</p>
+                </section>
+                <section class="dashboard-task-card productivity-card" aria-labelledby="productivity-heading">
+                    <div class="dashboard-card-heading"><div><span class="section-label">THIS WEEK</span><h3 id="productivity-heading">Productivity</h3></div></div>
+                    <div class="mini-chart" id="miniProductivityChart" aria-label="Tasks completed this week"></div>
+                </section>
+            </div>
         </section>
 
         <section class="streak-panel" aria-labelledby="streak-heading">
