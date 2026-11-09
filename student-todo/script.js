@@ -222,7 +222,7 @@ function getAnalyticsRange() {
 }
 
 function isDateInRange(dateKey, range) {
-    return !dateKey || (dateKey >= getLocalDateKey(range.start) && dateKey < getLocalDateKey(range.end));
+    return Boolean(dateKey) && dateKey >= getLocalDateKey(range.start) && dateKey < getLocalDateKey(range.end);
 }
 
 function getTaskAnalyticsDate(task) {
