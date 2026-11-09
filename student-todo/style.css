@@ -1254,6 +1254,28 @@ h2 {
     margin-bottom: 24px;
 }
 
+.settings-card {
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.settings-card h3 {
+    margin-top: 0;
+}
+
+.settings-card p {
+    color: var(--muted);
+}
+
+.settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+}
+
 .planner-controls {
     display: flex;
     align-items: center;

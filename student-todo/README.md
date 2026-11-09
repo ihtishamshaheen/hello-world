@@ -206,3 +206,25 @@ Configure scheduled invocations for `send-task-reminders` every minute and
 key only on the server, claim reminder rows with a database uniqueness guard,
 and generate recurrence instances with the same guard. Do not put any of these
 secrets in `config.js`, frontend JavaScript, or the repository.
+
+## Data export and PWA
+
+The Settings view exports only the signed-in user's tasks. Each export performs
+a fresh Supabase query filtered by the current authenticated `user_id`, so RLS
+continues to enforce ownership. CSV and JSON downloads are generated locally
+in the browser; no export data is sent to another service.
+
+The static PWA files are [`manifest.webmanifest`](manifest.webmanifest),
+[`sw.js`](sw.js), [`offline.html`](offline.html), and
+[`icons/icon.svg`](icons/icon.svg). The service worker caches only same-origin
+static assets and the public Supabase client library. It does not cache
+Supabase REST responses, authentication tokens, or user task data.
+Supabase API/auth requests remain network-only, and a successful `online` event
+reloads the authenticated task list.
+
+Deploy the `student-todo` folder over HTTPS (Vercel provides this
+automatically), then verify the browser's install prompt and Application >
+Service Workers panel. To test offline mode, load the app once while online,
+enable offline mode in developer tools, reload to see the fallback, then
+disable offline mode and verify the app synchronizes after the connection is
+restored.

@@ -67,6 +67,10 @@ const analyticsViewTab = document.getElementById("analyticsViewTab");
 const analyticsPanel = document.getElementById("analyticsPanel");
 const kanbanViewTab = document.getElementById("kanbanViewTab");
 const kanbanPanel = document.getElementById("kanbanPanel");
+const settingsViewTab = document.getElementById("settingsViewTab");
+const settingsPanel = document.getElementById("settingsPanel");
+const exportTasksCsv = document.getElementById("exportTasksCsv");
+const exportTasksJson = document.getElementById("exportTasksJson");
 const kanbanCategoryFilter = document.getElementById("kanbanCategoryFilter");
 const kanbanPriorityFilter = document.getElementById("kanbanPriorityFilter");
 const kanbanLoading = document.getElementById("kanbanLoading");
@@ -620,25 +624,92 @@ function setActiveView(view) {
     const showFocus = view === "focus";
     const showAnalytics = view === "analytics";
     const showKanban = view === "kanban";
-    taskPanel.hidden = showPlanner || showFocus || showAnalytics || showKanban;
+    const showSettings = view === "settings";
+    taskPanel.hidden = showPlanner || showFocus || showAnalytics || showKanban || showSettings;
     plannerPanel.hidden = !showPlanner;
     focusPanel.hidden = !showFocus;
     analyticsPanel.hidden = !showAnalytics;
     kanbanPanel.hidden = !showKanban;
+    settingsPanel.hidden = !showSettings;
     tasksViewTab.classList.toggle("active", view === "tasks");
     plannerViewTab.classList.toggle("active", showPlanner);
     focusViewTab.classList.toggle("active", showFocus);
     analyticsViewTab.classList.toggle("active", showAnalytics);
     kanbanViewTab.classList.toggle("active", showKanban);
+    settingsViewTab.classList.toggle("active", showSettings);
     tasksViewTab.setAttribute("aria-selected", String(view === "tasks"));
     plannerViewTab.setAttribute("aria-selected", String(showPlanner));
     focusViewTab.setAttribute("aria-selected", String(showFocus));
     analyticsViewTab.setAttribute("aria-selected", String(showAnalytics));
     kanbanViewTab.setAttribute("aria-selected", String(showKanban));
+    settingsViewTab.setAttribute("aria-selected", String(showSettings));
     if (showPlanner) renderPlanner();
     if (showFocus) renderFocusTaskOptions();
     if (showAnalytics) loadAnalytics();
     if (showKanban) renderKanban();
+}
+
+function getExportRows(sourceTasks) {
+    return sourceTasks.map((task) => ({
+        title: task.text,
+        description: task.description,
+        priority: task.priority,
+        category: task.category,
+        due_date: task.dueDate || "",
+        completed: task.completed,
+        created_at: task.createdAt || ""
+    }));
+}
+
+function downloadExport(content, fileName, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function escapeCsvValue(value) {
+    const text = String(value ?? "");
+    return `"${text.replace(/"/g, '""')}"`;
+}
+
+async function exportTasks(format) {
+    if (!currentUser || !supabaseClient) {
+        showToast("Sign in before exporting your tasks.", "error");
+        return;
+    }
+    exportTasksCsv.disabled = true;
+    exportTasksJson.disabled = true;
+    try {
+        const { data, error } = await supabaseClient
+            .from("Tasks")
+            .select("text,description,priority,category,due_date,completed,created_at")
+            .eq("user_id", currentUser.id)
+            .order("created_at", { ascending: true });
+        if (error) throw error;
+        const rows = getExportRows(data.map(mapTask));
+        const stamp = getLocalDateKey();
+        if (format === "json") {
+            downloadExport(JSON.stringify(rows, null, 2), `study-desk-tasks-${stamp}.json`, "application/json");
+        } else {
+            const headers = ["title", "description", "priority", "category", "due_date", "completed", "created_at"];
+            const csv = [headers, ...rows.map((row) => headers.map((header) => row[header]))]
+                .map((row) => row.map(escapeCsvValue).join(","))
+                .join("\r\n");
+            downloadExport(`\uFEFF${csv}`, `study-desk-tasks-${stamp}.csv`, "text/csv;charset=utf-8");
+        }
+        showToast(`Tasks exported as ${format.toUpperCase()}.`);
+    } catch (error) {
+        showToast(`Could not export tasks: ${error.message}`, "error");
+    } finally {
+        exportTasksCsv.disabled = false;
+        exportTasksJson.disabled = false;
+    }
 }
 
 function getFocusDurationSeconds() {
@@ -1543,6 +1614,9 @@ plannerViewTab.addEventListener("click", () => setActiveView("planner"));
 focusViewTab.addEventListener("click", () => setActiveView("focus"));
 analyticsViewTab.addEventListener("click", () => setActiveView("analytics"));
 kanbanViewTab.addEventListener("click", () => setActiveView("kanban"));
+settingsViewTab.addEventListener("click", () => setActiveView("settings"));
+exportTasksCsv.addEventListener("click", () => exportTasks("csv"));
+exportTasksJson.addEventListener("click", () => exportTasks("json"));
 kanbanCategoryFilter.addEventListener("change", () => {
     kanbanCategory = kanbanCategoryFilter.value;
     renderKanban();
@@ -1601,6 +1675,18 @@ focusTaskSelect.addEventListener("change", updateFocusTaskLabel);
 setInterval(() => {
     if (currentUser) renderTasks();
 }, 60000);
+window.addEventListener("online", () => {
+    if (!currentUser) return;
+    showToast("Connection restored. Syncing your tasks.");
+    loadTasks();
+});
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((error) => {
+            console.error("Could not register the service worker.", error);
+        });
+    });
+}
 closeEditModal.addEventListener("click", closeEditDialog);
 cancelEdit.addEventListener("click", closeEditDialog);
 editModal.addEventListener("click", (event) => {

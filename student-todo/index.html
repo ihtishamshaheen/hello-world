@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Study Desk | Student To-Do List</title>
+    <meta name="theme-color" content="#e85d3f">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -124,6 +127,7 @@
             <button class="view-tab" id="focusViewTab" type="button" aria-selected="false">Focus timer</button>
             <button class="view-tab" id="analyticsViewTab" type="button" aria-selected="false">Analytics</button>
             <button class="view-tab" id="kanbanViewTab" type="button" aria-selected="false">Kanban board</button>
+            <button class="view-tab" id="settingsViewTab" type="button" aria-selected="false">Settings</button>
         </nav>
 
         <section class="task-panel" aria-labelledby="tasks-heading">
@@ -366,6 +370,23 @@
                     <div><strong id="analyticsCurrentStreak">0</strong><span> current days</span></div>
                     <div><strong id="analyticsLongestStreak">0</strong><span> longest days</span></div>
                 </section>
+            </div>
+        </section>
+
+        <section class="settings-panel" id="settingsPanel" aria-labelledby="settings-heading" hidden>
+            <div class="panel-heading">
+                <div>
+                    <span class="section-label">YOUR DATA</span>
+                    <h2 id="settings-heading">Settings</h2>
+                </div>
+            </div>
+            <div class="settings-card">
+                <h3>Export your tasks</h3>
+                <p>Downloads include only your authenticated tasks and never leave your device through this feature.</p>
+                <div class="settings-actions">
+                    <button class="calendar-button" id="exportTasksCsv" type="button">Export CSV</button>
+                    <button class="add-button" id="exportTasksJson" type="button">Export JSON</button>
+                </div>
             </div>
         </section>
     </main>
