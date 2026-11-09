@@ -67,6 +67,37 @@ with check (auth.uid() = user_id);
 
 No existing authentication or `Tasks` RLS policies need to change.
 
+## Study streak persistence
+
+A study day is recorded when the signed-in user marks a task completed or finishes a
+focus session. The app records the user's local calendar date only once; future dates
+are ignored when calculating streaks. Create this table in Supabase SQL Editor:
+
+```sql
+create table if not exists public."StudyActivity" (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    activity_date date not null,
+    unique (user_id, activity_date)
+);
+
+alter table public."StudyActivity" enable row level security;
+
+create policy "Users can view their own study activity"
+on public."StudyActivity" for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can record their own study activity"
+on public."StudyActivity" for insert
+to authenticated
+with check (auth.uid() = user_id);
+```
+
+The unique constraint prevents duplicate activity rows for the same user and date.
+The client uses the browser's local date for activity events and scopes every query
+by the authenticated user's ID.
+
 The client sends `user_id` from the authenticated session and also filters every read, update, and delete by `user_id`. It never disables or bypasses RLS.
 
 Before deployment, verify in Supabase Table Editor or SQL Editor that:

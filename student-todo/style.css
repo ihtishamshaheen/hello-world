@@ -419,6 +419,99 @@ h2 {
     margin-bottom: 18px;
 }
 
+.streak-panel {
+    display: grid;
+    gap: 24px;
+    margin-bottom: 18px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.streak-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.streak-message {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.streak-stats {
+    display: flex;
+    gap: 10px;
+}
+
+.streak-stat {
+    min-width: 105px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.streak-stat strong {
+    display: block;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.65rem;
+}
+
+.streak-stat span {
+    color: var(--muted);
+    font-size: 0.72rem;
+}
+
+.activity-calendar {
+    display: grid;
+    gap: 10px;
+}
+
+.activity-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.activity-day {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 8px 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.7rem;
+}
+
+.activity-day strong {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--ink);
+    font-size: 0.78rem;
+}
+
+.activity-day-active strong {
+    background: var(--accent);
+    color: #fff;
+}
+
+.activity-day-today {
+    border-color: var(--accent);
+}
+
+.activity-day-future {
+    opacity: 0.45;
+}
+
 .view-tab,
 .calendar-button {
     padding: 9px 14px;
@@ -1108,6 +1201,22 @@ select:focus {
     .dashboard {
         flex-wrap: wrap;
         padding: 18px;
+    }
+
+    .streak-panel {
+        padding: 20px 18px;
+    }
+
+    .streak-summary {
+        flex-direction: column;
+    }
+
+    .streak-stats {
+        width: 100%;
+    }
+
+    .streak-stat {
+        flex: 1;
     }
 
     .progress-copy {

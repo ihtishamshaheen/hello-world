@@ -63,6 +63,10 @@ const focusTaskSelect = document.getElementById("focusTaskSelect");
 const focusDuration = document.getElementById("focusDuration");
 const shortBreakDuration = document.getElementById("shortBreakDuration");
 const longBreakDuration = document.getElementById("longBreakDuration");
+const currentStreak = document.getElementById("currentStreak");
+const longestStreak = document.getElementById("longestStreak");
+const streakMessage = document.getElementById("streakMessage");
+const activityDays = document.getElementById("activityDays");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
 let searchQuery = "";
@@ -83,6 +87,7 @@ let focusTotalSeconds = 25 * 60;
 let focusTimerId = null;
 let focusSessionTotal = 0;
 let completedFocusSessions = 0;
+let studyActivityDates = [];
 
 function getLocalDateKey(date = new Date()) {
     const year = date.getFullYear();
@@ -122,6 +127,101 @@ function getWeekDates() {
         date.setDate(monday.getDate() + index);
         return getLocalDateKey(date);
     });
+}
+
+function getCurrentWeekDates() {
+    const savedOffset = calendarWeekOffset;
+    calendarWeekOffset = 0;
+    const dates = getWeekDates();
+    calendarWeekOffset = savedOffset;
+    return dates;
+}
+
+function calculateStreaks(activityDates) {
+    const dates = [...new Set(activityDates)]
+        .filter((date) => date <= getLocalDateKey())
+        .sort();
+    const dateSet = new Set(dates);
+    let longest = 0;
+    let run = 0;
+    let previousDate = null;
+    dates.forEach((date) => {
+        const currentDate = parseLocalDate(date);
+        const expectedDate = previousDate ? new Date(previousDate) : null;
+        if (expectedDate) expectedDate.setDate(expectedDate.getDate() + 1);
+        const isConsecutive = expectedDate && date === getLocalDateKey(expectedDate);
+        run = isConsecutive ? run + 1 : 1;
+        longest = Math.max(longest, run);
+        previousDate = currentDate;
+    });
+
+    let current = 0;
+    const cursor = parseLocalDate(getLocalDateKey());
+    if (!dateSet.has(getLocalDateKey())) cursor.setDate(cursor.getDate() - 1);
+    while (dateSet.has(getLocalDateKey(cursor))) {
+        current += 1;
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return { current, longest };
+}
+
+function renderStudyStreak() {
+    const streaks = calculateStreaks(studyActivityDates);
+    currentStreak.textContent = streaks.current;
+    longestStreak.textContent = streaks.longest;
+    streakMessage.textContent = streaks.current > 0
+        ? (streaks.current >= 3 ? "You are building a strong study habit." : "Keep going to grow your streak.")
+        : "Complete a task or focus session to start your streak.";
+
+    activityDays.innerHTML = "";
+    const today = getLocalDateKey();
+    getCurrentWeekDates().forEach((dateKey) => {
+        const date = parseLocalDate(dateKey);
+        const day = document.createElement("div");
+        const isFuture = dateKey > today;
+        day.className = `activity-day${studyActivityDates.includes(dateKey) ? " activity-day-active" : ""}${dateKey === today ? " activity-day-today" : ""}${isFuture ? " activity-day-future" : ""}`;
+        const label = document.createElement("span");
+        label.textContent = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
+        const marker = document.createElement("strong");
+        marker.textContent = studyActivityDates.includes(dateKey) ? "✓" : date.getDate();
+        day.append(label, marker);
+        activityDays.appendChild(day);
+    });
+}
+
+async function loadStudyActivity() {
+    if (!currentUser) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from("StudyActivity")
+            .select("activity_date")
+            .eq("user_id", currentUser.id)
+            .lte("activity_date", getLocalDateKey())
+            .order("activity_date", { ascending: true });
+        if (error) throw error;
+        studyActivityDates = data.map((row) => row.activity_date);
+        renderStudyStreak();
+    } catch (error) {
+        showToast(`Could not load study streak: ${error.message}`, "error");
+    }
+}
+
+async function recordStudyActivity() {
+    if (!currentUser) return;
+    const activityDate = getLocalDateKey();
+    const before = calculateStreaks(studyActivityDates).current;
+    if (studyActivityDates.includes(activityDate)) return;
+    const { error } = await supabaseClient
+        .from("StudyActivity")
+        .upsert({ user_id: currentUser.id, activity_date: activityDate }, {
+            onConflict: "user_id,activity_date",
+            ignoreDuplicates: true
+        });
+    if (error) throw error;
+    studyActivityDates = [...studyActivityDates, activityDate];
+    renderStudyStreak();
+    const after = calculateStreaks(studyActivityDates).current;
+    if (after > before) showToast(`Streak increased to ${after} ${after === 1 ? "day" : "days"}!`);
 }
 
 function formatWeekLabel(dates) {
@@ -221,6 +321,7 @@ async function saveCompletedFocusSession() {
     if (error) throw error;
     completedFocusSessions += 1;
     focusSessionCount.textContent = completedFocusSessions;
+    await recordStudyActivity();
 }
 
 async function finishTimerSession() {
@@ -516,6 +617,8 @@ function showAuth() {
     resetFocusTimer();
     completedFocusSessions = 0;
     focusSessionCount.textContent = "0";
+    studyActivityDates = [];
+    renderStudyStreak();
     setConfirmationState(false);
     setAuthMode("login");
     authShell.hidden = false;
@@ -681,6 +784,7 @@ async function loadTasks() {
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         loadFocusSessionCount();
+        loadStudyActivity();
     } catch (error) {
         showTaskError(`Could not load tasks: ${error.message}`);
         showToast(`Could not load tasks: ${error.message}`, "error");
@@ -739,6 +843,13 @@ async function toggleTask(id, completed) {
         renderTasks();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
+        if (!completed) {
+            try {
+                await recordStudyActivity();
+            } catch (activityError) {
+                showToast(`Task completed, but study activity could not be saved: ${activityError.message}`, "error");
+            }
+        }
         showToast(completed ? "Task marked incomplete." : "Task marked completed.");
     } catch (error) {
         showTaskError(`Could not update task: ${error.message}`);

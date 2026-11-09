@@ -73,6 +73,24 @@
             <div class="stat"><span id="completedCount">0</span><small>Done</small></div>
         </section>
 
+        <section class="streak-panel" aria-labelledby="streak-heading">
+            <div class="streak-summary">
+                <div>
+                    <span class="section-label">CONSISTENCY</span>
+                    <h2 id="streak-heading">Study streak</h2>
+                    <p class="streak-message" id="streakMessage">Complete a task or focus session to start your streak.</p>
+                </div>
+                <div class="streak-stats">
+                    <div class="streak-stat"><strong id="currentStreak">0</strong><span>Current days</span></div>
+                    <div class="streak-stat"><strong id="longestStreak">0</strong><span>Longest days</span></div>
+                </div>
+            </div>
+            <div class="activity-calendar" aria-label="Weekly study activity">
+                <span class="section-label">THIS WEEK</span>
+                <div class="activity-days" id="activityDays"></div>
+            </div>
+        </section>
+
         <nav class="view-tabs" aria-label="Study desk views">
             <button class="view-tab active" id="tasksViewTab" type="button" aria-selected="true">Task list</button>
             <button class="view-tab" id="plannerViewTab" type="button" aria-selected="false">Study planner</button>
