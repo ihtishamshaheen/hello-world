@@ -36,6 +36,18 @@ const closeEditModal = document.getElementById("closeEditModal");
 const cancelEdit = document.getElementById("cancelEdit");
 const saveEdit = document.getElementById("saveEdit");
 const toastRegion = document.getElementById("toastRegion");
+const tasksViewTab = document.getElementById("tasksViewTab");
+const plannerViewTab = document.getElementById("plannerViewTab");
+const taskPanel = document.querySelector(".task-panel");
+const plannerPanel = document.getElementById("plannerPanel");
+const previousWeek = document.getElementById("previousWeek");
+const nextWeek = document.getElementById("nextWeek");
+const weekLabel = document.getElementById("weekLabel");
+const calendarGrid = document.getElementById("calendarGrid");
+const agendaTitle = document.getElementById("agendaTitle");
+const agendaList = document.getElementById("agendaList");
+const agendaEmpty = document.getElementById("agendaEmpty");
+const addForDate = document.getElementById("addForDate");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
 let searchQuery = "";
@@ -46,6 +58,9 @@ let currentUser = null;
 let confirmationSent = false;
 let confirmationRedirectInProgress = false;
 let editingTask = null;
+let calendarWeekOffset = 0;
+let selectedCalendarDate = getLocalDateKey();
+let activeView = "tasks";
 const activeToasts = new Set();
 
 function getLocalDateKey(date = new Date()) {
@@ -68,6 +83,98 @@ function formatDueDate(dueDate) {
     return new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium"
     }).format(new Date(year, month - 1, day));
+}
+
+function parseLocalDate(dateKey) {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function getWeekDates() {
+    const today = parseLocalDate(getLocalDateKey());
+    const day = today.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset + calendarWeekOffset * 7);
+    return Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + index);
+        return getLocalDateKey(date);
+    });
+}
+
+function formatWeekLabel(dates) {
+    const first = parseLocalDate(dates[0]);
+    const last = parseLocalDate(dates[6]);
+    const formatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return `${formatter.format(first)} - ${formatter.format(last)}`;
+}
+
+function setActiveView(view) {
+    activeView = view;
+    const showPlanner = view === "planner";
+    taskPanel.hidden = showPlanner;
+    plannerPanel.hidden = !showPlanner;
+    tasksViewTab.classList.toggle("active", !showPlanner);
+    plannerViewTab.classList.toggle("active", showPlanner);
+    tasksViewTab.setAttribute("aria-selected", String(!showPlanner));
+    plannerViewTab.setAttribute("aria-selected", String(showPlanner));
+    if (showPlanner) renderPlanner();
+}
+
+function createCalendarTaskEntry(task) {
+    const entry = document.createElement("button");
+    entry.className = `calendar-task${task.completed ? " calendar-task-completed" : ""}`;
+    entry.type = "button";
+    entry.title = `Edit ${task.text}`;
+    entry.addEventListener("click", () => openEditModal(task));
+    const title = document.createElement("strong");
+    title.textContent = task.text;
+    const details = document.createElement("span");
+    details.textContent = `${task.priority} priority · ${task.completed ? "Completed" : "Active"}`;
+    entry.append(title, details);
+    return entry;
+}
+
+function renderPlanner() {
+    const dates = getWeekDates();
+    weekLabel.textContent = formatWeekLabel(dates);
+    calendarGrid.innerHTML = "";
+    dates.forEach((dateKey) => {
+        const date = parseLocalDate(dateKey);
+        const day = document.createElement("section");
+        const isToday = dateKey === getLocalDateKey();
+        const isSelected = dateKey === selectedCalendarDate;
+        day.className = `calendar-day${isToday ? " calendar-today" : ""}${isSelected ? " calendar-selected" : ""}`;
+        const heading = document.createElement("button");
+        heading.className = "calendar-day-heading";
+        heading.type = "button";
+        heading.setAttribute("aria-label", `Show tasks for ${date.toLocaleDateString()}`);
+        heading.innerHTML = `<span>${new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date)}</span><strong>${date.getDate()}</strong>`;
+        heading.addEventListener("click", () => {
+            selectedCalendarDate = dateKey;
+            renderPlanner();
+        });
+        const entries = document.createElement("div");
+        entries.className = "calendar-entries";
+        tasks.filter((task) => task.dueDate === dateKey).forEach((task) => entries.appendChild(createCalendarTaskEntry(task)));
+        day.append(heading, entries);
+        calendarGrid.appendChild(day);
+    });
+
+    const selectedDate = parseLocalDate(selectedCalendarDate);
+    agendaTitle.textContent = new Intl.DateTimeFormat(undefined, {
+        weekday: "long", month: "long", day: "numeric"
+    }).format(selectedDate);
+    agendaList.innerHTML = "";
+    const agendaTasks = tasks.filter((task) => task.dueDate === selectedCalendarDate);
+    agendaEmpty.hidden = agendaTasks.length > 0;
+    agendaTasks.forEach((task) => {
+        const item = document.createElement("li");
+        const entry = createCalendarTaskEntry(task);
+        item.appendChild(entry);
+        agendaList.appendChild(item);
+    });
 }
 
 const config = window.SUPABASE_CONFIG;
@@ -399,6 +506,7 @@ async function loadTasks() {
         }
         tasks = data.map(mapTask);
         renderTasks();
+        if (activeView === "planner") renderPlanner();
     } catch (error) {
         showTaskError(`Could not load tasks: ${error.message}`);
         showToast(`Could not load tasks: ${error.message}`, "error");
@@ -430,6 +538,7 @@ async function addTask(event) {
         }
         tasks.unshift(mapTask(data));
         renderTasks();
+        if (activeView === "planner") renderPlanner();
         taskForm.reset();
         taskInput.focus();
         showToast("Task created successfully.");
@@ -453,6 +562,7 @@ async function toggleTask(id, completed) {
         }
         tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
         renderTasks();
+        if (activeView === "planner") renderPlanner();
         showToast(completed ? "Task marked incomplete." : "Task marked completed.");
     } catch (error) {
         showTaskError(`Could not update task: ${error.message}`);
@@ -472,6 +582,7 @@ async function deleteTask(id) {
         }
         tasks = tasks.filter((task) => task.id !== id);
         renderTasks();
+        if (activeView === "planner") renderPlanner();
         showToast("Task deleted successfully.");
     } catch (error) {
         showTaskError(`Could not delete task: ${error.message}`);
@@ -542,6 +653,7 @@ async function saveEditedTask(event) {
     tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
     closeEditDialog();
     renderTasks();
+    if (activeView === "planner") renderPlanner();
     showTaskMessage("Task updated successfully.");
     showToast("Task updated successfully.");
 }
@@ -647,6 +759,24 @@ categoryFilter.addEventListener("change", () => {
     renderTasks();
 });
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
+tasksViewTab.addEventListener("click", () => setActiveView("tasks"));
+plannerViewTab.addEventListener("click", () => setActiveView("planner"));
+previousWeek.addEventListener("click", () => {
+    calendarWeekOffset -= 1;
+    selectedCalendarDate = getWeekDates()[0];
+    renderPlanner();
+});
+nextWeek.addEventListener("click", () => {
+    calendarWeekOffset += 1;
+    selectedCalendarDate = getWeekDates()[0];
+    renderPlanner();
+});
+addForDate.addEventListener("click", () => {
+    setActiveView("tasks");
+    taskDueDate.value = selectedCalendarDate;
+    taskInput.focus();
+    showToast(`New task due ${formatDueDate(selectedCalendarDate)}.`);
+});
 setInterval(() => {
     if (currentUser) renderTasks();
 }, 60000);

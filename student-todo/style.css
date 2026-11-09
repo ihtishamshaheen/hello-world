@@ -413,6 +413,34 @@ h2 {
     box-shadow: var(--shadow);
 }
 
+.view-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.view-tab,
+.calendar-button {
+    padding: 9px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.view-tab:hover,
+.calendar-button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.view-tab.active {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--surface);
+}
+
 .progress-copy {
     flex: 1;
     min-width: 190px;
@@ -463,6 +491,149 @@ h2 {
     border-radius: 14px;
     background: var(--surface);
     box-shadow: var(--shadow);
+}
+
+.planner-panel {
+    padding: 30px;
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.planner-heading {
+    margin-bottom: 24px;
+}
+
+.planner-controls {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.planner-controls strong {
+    min-width: 180px;
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.calendar-day {
+    min-height: 180px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
+}
+
+.calendar-day.calendar-today {
+    border-color: var(--accent);
+}
+
+.calendar-day.calendar-selected {
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.calendar-day-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    text-align: left;
+}
+
+.calendar-day-heading strong {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--ink);
+}
+
+.calendar-today .calendar-day-heading strong {
+    background: var(--accent);
+    color: #fff;
+}
+
+.calendar-entries {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+}
+
+.calendar-task {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    text-align: left;
+}
+
+.calendar-task:hover {
+    border-color: var(--accent);
+}
+
+.calendar-task strong {
+    overflow: hidden;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendar-task span {
+    color: var(--muted);
+    font-size: 0.68rem;
+}
+
+.calendar-task-completed {
+    opacity: 0.65;
+    text-decoration: line-through;
+}
+
+.agenda {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+}
+
+.agenda-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.agenda-add {
+    padding: 10px 15px;
+}
+
+.agenda-list {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.agenda-list .calendar-task {
+    display: grid;
+    max-width: 100%;
+    padding: 12px;
 }
 
 .task-date {
@@ -836,6 +1007,10 @@ select:focus {
         padding: 22px 18px;
     }
 
+    .planner-panel {
+        padding: 22px 18px;
+    }
+
     .task-form {
         grid-template-columns: 1fr 1fr;
     }
@@ -876,6 +1051,29 @@ select:focus {
 
     .edit-modal {
         padding: 22px 18px;
+    }
+
+    .planner-heading,
+    .agenda-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .planner-controls {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .planner-controls strong {
+        min-width: 0;
+    }
+
+    .calendar-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .calendar-day {
+        min-height: auto;
     }
 
     .toast-region {

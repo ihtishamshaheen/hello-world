@@ -73,6 +73,11 @@
             <div class="stat"><span id="completedCount">0</span><small>Done</small></div>
         </section>
 
+        <nav class="view-tabs" aria-label="Study desk views">
+            <button class="view-tab active" id="tasksViewTab" type="button" aria-selected="true">Task list</button>
+            <button class="view-tab" id="plannerViewTab" type="button" aria-selected="false">Study planner</button>
+        </nav>
+
         <section class="task-panel" aria-labelledby="tasks-heading">
             <div class="panel-heading">
                 <div>
@@ -135,6 +140,32 @@
             <p class="loading-state" id="loadingState" hidden>Loading your tasks...</p>
             <p class="task-message" id="taskMessage" role="status" aria-live="polite" hidden></p>
             <p class="error-state" id="taskError" role="alert" hidden></p>
+        </section>
+
+        <section class="planner-panel" id="plannerPanel" aria-labelledby="planner-heading" hidden>
+            <div class="panel-heading planner-heading">
+                <div>
+                    <span class="section-label">WEEKLY PLAN</span>
+                    <h2 id="planner-heading">Study planner</h2>
+                </div>
+                <div class="planner-controls">
+                    <button class="calendar-button" id="previousWeek" type="button">Previous</button>
+                    <strong id="weekLabel"></strong>
+                    <button class="calendar-button" id="nextWeek" type="button">Next</button>
+                </div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid" aria-label="Weekly calendar"></div>
+            <div class="agenda">
+                <div class="agenda-heading">
+                    <div>
+                        <span class="section-label">DAILY AGENDA</span>
+                        <h2 id="agendaTitle">Today</h2>
+                    </div>
+                    <button class="add-button agenda-add" id="addForDate" type="button">Add task</button>
+                </div>
+                <ul class="agenda-list" id="agendaList"></ul>
+                <p class="empty-state" id="agendaEmpty">No tasks scheduled for this day.</p>
+            </div>
         </section>
     </main>
 
