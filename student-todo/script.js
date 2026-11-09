@@ -52,6 +52,12 @@ const focusViewTab = document.getElementById("focusViewTab");
 const focusPanel = document.getElementById("focusPanel");
 const analyticsViewTab = document.getElementById("analyticsViewTab");
 const analyticsPanel = document.getElementById("analyticsPanel");
+const kanbanViewTab = document.getElementById("kanbanViewTab");
+const kanbanPanel = document.getElementById("kanbanPanel");
+const kanbanCategoryFilter = document.getElementById("kanbanCategoryFilter");
+const kanbanPriorityFilter = document.getElementById("kanbanPriorityFilter");
+const kanbanLoading = document.getElementById("kanbanLoading");
+const kanbanBoard = document.getElementById("kanbanBoard");
 const weeklyAnalytics = document.getElementById("weeklyAnalytics");
 const monthlyAnalytics = document.getElementById("monthlyAnalytics");
 const analyticsLoading = document.getElementById("analyticsLoading");
@@ -94,6 +100,8 @@ let selectedCalendarDate = getLocalDateKey();
 let activeView = "tasks";
 let analyticsPeriod = "weekly";
 let analyticsRequestId = 0;
+let kanbanCategory = "all";
+let kanbanPriority = "all";
 const activeToasts = new Set();
 let focusMode = "focus";
 let focusSecondsRemaining = 25 * 60;
@@ -338,6 +346,133 @@ function refreshAnalyticsIfVisible() {
     if (activeView === "analytics") loadAnalytics();
 }
 
+function getKanbanStatus(task) {
+    if (task.status === "completed" || task.completed) return "completed";
+    return task.status === "in_progress" ? "in_progress" : "todo";
+}
+
+function createKanbanCard(task) {
+    const card = document.createElement("article");
+    card.className = `kanban-card${task.completed ? " kanban-card-completed" : ""}`;
+    card.draggable = true;
+    card.dataset.taskId = String(task.id);
+    card.addEventListener("dragstart", (event) => {
+        event.dataTransfer.setData("text/plain", String(task.id));
+        event.dataTransfer.effectAllowed = "move";
+        card.classList.add("kanban-dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("kanban-dragging"));
+
+    const title = document.createElement("h4");
+    title.textContent = task.text;
+    const details = document.createElement("div");
+    details.className = "kanban-card-details";
+    const priority = document.createElement("span");
+    priority.className = `priority priority-${task.priority}`;
+    priority.textContent = `${task.priority} priority`;
+    const category = document.createElement("span");
+    category.className = "category-badge";
+    category.textContent = task.category;
+    details.append(priority, category);
+    if (task.dueDate) {
+        const dueDate = document.createElement("span");
+        dueDate.className = `kanban-due-date${getTaskStatus(task) === "overdue" ? " kanban-due-overdue" : ""}`;
+        dueDate.textContent = getTaskStatus(task) === "overdue"
+            ? `Overdue · ${formatDueDate(task.dueDate)}`
+            : `Due · ${formatDueDate(task.dueDate)}`;
+        details.appendChild(dueDate);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "kanban-card-actions";
+    const edit = document.createElement("button");
+    edit.className = "edit-button";
+    edit.type = "button";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => openEditModal(task));
+    const remove = document.createElement("button");
+    remove.className = "delete-button";
+    remove.type = "button";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => deleteTask(task.id));
+    actions.append(edit, remove);
+    card.append(title, details, actions);
+    return card;
+}
+
+function renderKanban() {
+    const columns = {
+        todo: document.getElementById("todoCards"),
+        in_progress: document.getElementById("inProgressCards"),
+        completed: document.getElementById("kanbanCompletedCards")
+    };
+    Object.values(columns).forEach((column) => column.replaceChildren());
+    const visibleTasks = tasks.filter((task) =>
+        (kanbanCategory === "all" || task.category === kanbanCategory)
+        && (kanbanPriority === "all" || task.priority === kanbanPriority)
+    );
+    visibleTasks.forEach((task) => columns[getKanbanStatus(task)].appendChild(createKanbanCard(task)));
+    Object.entries(columns).forEach(([status, column]) => {
+        const count = status === "todo" ? "todoCount" : status === "in_progress" ? "inProgressCount" : "kanbanCompletedCount";
+        column.closest(".kanban-column").classList.toggle("kanban-column-empty", column.children.length === 0);
+        document.getElementById(count).textContent = column.children.length;
+    });
+}
+
+async function moveTaskToStatus(taskId, status) {
+    const task = tasks.find((item) => String(item.id) === String(taskId));
+    if (!task || !currentUser || getKanbanStatus(task) === status) return;
+    kanbanLoading.hidden = false;
+    const completed = status === "completed";
+    try {
+        const { data, error } = await supabaseClient
+            .from("Tasks")
+            .update({ status, completed })
+            .eq("id", task.id)
+            .eq("user_id", currentUser.id)
+            .select()
+            .single();
+        if (error) throw error;
+        tasks = tasks.map((item) => item.id === task.id ? mapTask(data) : item);
+        renderKanban();
+        renderTasks();
+        renderFocusTaskOptions();
+        if (activeView === "planner") renderPlanner();
+        if (completed) {
+            try {
+                await recordStudyActivity();
+            } catch (activityError) {
+                showToast(`Task moved, but study activity could not be saved: ${activityError.message}`, "error");
+            }
+        }
+        refreshAnalyticsIfVisible();
+        showToast(`Task moved to ${status === "in_progress" ? "In Progress" : status === "completed" ? "Completed" : "To Do"}.`);
+    } catch (error) {
+        showToast(`Could not move task: ${error.message}`, "error");
+    } finally {
+        kanbanLoading.hidden = true;
+    }
+}
+
+kanbanBoard.addEventListener("dragover", (event) => {
+    const column = event.target.closest(".kanban-column");
+    if (!column) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    column.classList.add("kanban-column-drop-target");
+});
+kanbanBoard.addEventListener("dragleave", (event) => {
+    const column = event.target.closest(".kanban-column");
+    if (column && !column.contains(event.relatedTarget)) column.classList.remove("kanban-column-drop-target");
+});
+kanbanBoard.addEventListener("drop", (event) => {
+    const column = event.target.closest(".kanban-column");
+    if (!column) return;
+    event.preventDefault();
+    column.classList.remove("kanban-column-drop-target");
+    moveTaskToStatus(event.dataTransfer.getData("text/plain"), column.dataset.status);
+});
+
 async function loadStudyActivity() {
     if (!currentUser) return;
     try {
@@ -386,21 +521,26 @@ function setActiveView(view) {
     const showPlanner = view === "planner";
     const showFocus = view === "focus";
     const showAnalytics = view === "analytics";
-    taskPanel.hidden = showPlanner || showFocus || showAnalytics;
+    const showKanban = view === "kanban";
+    taskPanel.hidden = showPlanner || showFocus || showAnalytics || showKanban;
     plannerPanel.hidden = !showPlanner;
     focusPanel.hidden = !showFocus;
     analyticsPanel.hidden = !showAnalytics;
+    kanbanPanel.hidden = !showKanban;
     tasksViewTab.classList.toggle("active", view === "tasks");
     plannerViewTab.classList.toggle("active", showPlanner);
     focusViewTab.classList.toggle("active", showFocus);
     analyticsViewTab.classList.toggle("active", showAnalytics);
+    kanbanViewTab.classList.toggle("active", showKanban);
     tasksViewTab.setAttribute("aria-selected", String(view === "tasks"));
     plannerViewTab.setAttribute("aria-selected", String(showPlanner));
     focusViewTab.setAttribute("aria-selected", String(showFocus));
     analyticsViewTab.setAttribute("aria-selected", String(showAnalytics));
+    kanbanViewTab.setAttribute("aria-selected", String(showKanban));
     if (showPlanner) renderPlanner();
     if (showFocus) renderFocusTaskOptions();
     if (showAnalytics) loadAnalytics();
+    if (showKanban) renderKanban();
 }
 
 function getFocusDurationSeconds() {
@@ -921,6 +1061,7 @@ function mapTask(task) {
         category: task.category || "Other",
         priority: task.priority || "medium",
         completed: Boolean(task.completed),
+        status: task.status || (task.completed ? "completed" : "todo"),
         createdAt: task.created_at || ""
     };
 }
@@ -938,6 +1079,7 @@ async function loadTasks() {
         }
         tasks = data.map(mapTask);
         renderTasks();
+        renderKanban();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         loadFocusSessionCount();
@@ -965,6 +1107,7 @@ async function addTask(event) {
             due_date: taskDueDate.value || null,
             category: taskCategory.value,
             completed: false,
+            status: "todo",
             user_id: currentUser.id
         }).select().single();
         if (error) {
@@ -992,14 +1135,21 @@ async function toggleTask(id, completed) {
     showTaskError();
     showTaskMessage();
     try {
-        const { error } = await supabaseClient.from("Tasks").update({ completed: !completed }).eq("id", id).eq("user_id", currentUser.id);
+        const nextCompleted = !completed;
+        const { error } = await supabaseClient.from("Tasks")
+            .update({ completed: nextCompleted, status: nextCompleted ? "completed" : "todo" })
+            .eq("id", id)
+            .eq("user_id", currentUser.id);
         if (error) {
             showTaskError(`Could not update task: ${error.message}`);
             showToast(`Could not update task: ${error.message}`, "error");
             return;
         }
-        tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
+        tasks = tasks.map((task) => task.id === id
+            ? { ...task, completed: nextCompleted, status: nextCompleted ? "completed" : "todo" }
+            : task);
         renderTasks();
+        renderKanban();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         if (!completed) {
@@ -1029,6 +1179,7 @@ async function deleteTask(id) {
         }
         tasks = tasks.filter((task) => task.id !== id);
         renderTasks();
+        renderKanban();
         refreshAnalyticsIfVisible();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
@@ -1102,6 +1253,7 @@ async function saveEditedTask(event) {
     tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
     closeEditDialog();
     renderTasks();
+    renderKanban();
     refreshAnalyticsIfVisible();
     renderFocusTaskOptions();
     if (activeView === "planner") renderPlanner();
@@ -1214,6 +1366,15 @@ tasksViewTab.addEventListener("click", () => setActiveView("tasks"));
 plannerViewTab.addEventListener("click", () => setActiveView("planner"));
 focusViewTab.addEventListener("click", () => setActiveView("focus"));
 analyticsViewTab.addEventListener("click", () => setActiveView("analytics"));
+kanbanViewTab.addEventListener("click", () => setActiveView("kanban"));
+kanbanCategoryFilter.addEventListener("change", () => {
+    kanbanCategory = kanbanCategoryFilter.value;
+    renderKanban();
+});
+kanbanPriorityFilter.addEventListener("change", () => {
+    kanbanPriority = kanbanPriorityFilter.value;
+    renderKanban();
+});
 weeklyAnalytics.addEventListener("click", () => {
     analyticsPeriod = "weekly";
     weeklyAnalytics.classList.add("active");

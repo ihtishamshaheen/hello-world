@@ -96,6 +96,7 @@
             <button class="view-tab" id="plannerViewTab" type="button" aria-selected="false">Study planner</button>
             <button class="view-tab" id="focusViewTab" type="button" aria-selected="false">Focus timer</button>
             <button class="view-tab" id="analyticsViewTab" type="button" aria-selected="false">Analytics</button>
+            <button class="view-tab" id="kanbanViewTab" type="button" aria-selected="false">Kanban board</button>
         </nav>
 
         <section class="task-panel" aria-labelledby="tasks-heading">
@@ -256,6 +257,52 @@
                     <section class="chart-card" aria-labelledby="completion-chart-heading">
                         <h3 id="completion-chart-heading">Task completion</h3>
                         <div class="bar-chart" id="completionChart"></div>
+                    </section>
+
+                    <section class="kanban-panel" id="kanbanPanel" aria-labelledby="kanban-heading" hidden>
+                        <div class="panel-heading kanban-heading">
+                            <div>
+                                <span class="section-label">WORKFLOW</span>
+                                <h2 id="kanban-heading">Kanban board</h2>
+                            </div>
+                            <div class="kanban-filters">
+                                <label class="sr-only" for="kanbanCategoryFilter">Filter by category</label>
+                                <select id="kanbanCategoryFilter" aria-label="Filter Kanban board by category">
+                                    <option value="all">All categories</option>
+                                    <option value="University">University</option>
+                                    <option value="Assignment">Assignment</option>
+                                    <option value="Exam Preparation">Exam Preparation</option>
+                                    <option value="Personal">Personal</option>
+                                    <option value="Project">Project</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <label class="sr-only" for="kanbanPriorityFilter">Filter by priority</label>
+                                <select id="kanbanPriorityFilter" aria-label="Filter Kanban board by priority">
+                                    <option value="all">All priorities</option>
+                                    <option value="high">High priority</option>
+                                    <option value="medium">Medium priority</option>
+                                    <option value="low">Low priority</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="loading-state" id="kanbanLoading" hidden>Loading your board...</p>
+                        <div class="kanban-board" id="kanbanBoard">
+                            <section class="kanban-column" data-status="todo" aria-labelledby="todo-heading">
+                                <div class="kanban-column-heading"><h3 id="todo-heading">To Do</h3><span id="todoCount">0</span></div>
+                                <div class="kanban-cards" id="todoCards"></div>
+                                <p class="kanban-empty">No tasks here.</p>
+                            </section>
+                            <section class="kanban-column" data-status="in_progress" aria-labelledby="in-progress-heading">
+                                <div class="kanban-column-heading"><h3 id="in-progress-heading">In Progress</h3><span id="inProgressCount">0</span></div>
+                                <div class="kanban-cards" id="inProgressCards"></div>
+                                <p class="kanban-empty">No tasks here.</p>
+                            </section>
+                            <section class="kanban-column" data-status="completed" aria-labelledby="kanban-completed-heading">
+                                <div class="kanban-column-heading"><h3 id="kanban-completed-heading">Completed</h3><span id="kanbanCompletedCount">0</span></div>
+                                <div class="kanban-cards" id="kanbanCompletedCards"></div>
+                                <p class="kanban-empty">No tasks here.</p>
+                            </section>
+                        </div>
                     </section>
                     <section class="chart-card" aria-labelledby="category-chart-heading">
                         <h3 id="category-chart-heading">Categories</h3>

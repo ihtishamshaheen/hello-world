@@ -24,6 +24,7 @@ The integration expects the existing `Tasks` table to have these columns:
 - `text`: task text
 - `priority`: text containing `low`, `medium`, or `high`
 - `completed`: boolean
+- `status`: text containing `todo`, `in_progress`, or `completed`
 - `due_date`: nullable `date` containing the user's calendar deadline as `YYYY-MM-DD`
 - `category`: nullable text containing one of `University`, `Assignment`, `Exam Preparation`, `Personal`, `Project`, or `Other`
 
@@ -33,6 +34,36 @@ The category migration used was:
 ```sql
 alter table public."Tasks" add column if not exists category text;
 ```
+
+The Kanban board requires this additional task-status migration. It backfills
+existing completed tasks without changing authentication or RLS policies:
+
+```sql
+alter table public."Tasks"
+    add column if not exists status text not null default 'todo';
+
+update public."Tasks"
+set status = 'completed'
+where completed = true;
+
+do $$
+begin
+    if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'tasks_status_check'
+          and conrelid = 'public."Tasks"'::regclass
+    ) then
+        alter table public."Tasks"
+            add constraint tasks_status_check
+            check (status in ('todo', 'in_progress', 'completed'));
+    end if;
+end $$;
+```
+
+The existing `completed` boolean remains synchronized with `status`: Kanban
+`Completed` uses `completed = true`, while `To Do` and `In Progress` use
+`completed = false`.
 
 No RLS policy changes were made or are required; the client continues to scope reads and writes by
 `user_id`, and existing policies should continue to enforce ownership.
