@@ -365,13 +365,14 @@ h2 {
 
 .task-form {
     display: grid;
-    grid-template-columns: 1fr 160px auto;
+    grid-template-columns: 1fr 160px 160px auto;
     gap: 10px;
     margin: 26px 0 22px;
 }
 
 input,
-select {
+select,
+textarea {
     min-width: 0;
     padding: 14px 15px;
     border: 1px solid var(--line);
@@ -407,6 +408,7 @@ select:focus {
 
 .filters {
     display: flex;
+    flex-wrap: wrap;
     gap: 7px;
 }
 
@@ -478,6 +480,28 @@ select:focus {
     overflow-wrap: anywhere;
     color: var(--muted);
     font-size: 0.88rem;
+}
+
+.due-date {
+    display: block;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.due-today {
+    color: #94620c;
+}
+
+.due-overdue,
+.overdue .due-date {
+    color: #b63d26;
+}
+
+.overdue {
+    border-left: 4px solid #b63d26;
+    padding-left: 11px !important;
 }
 
 .completed .task-label {

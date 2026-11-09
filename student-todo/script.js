@@ -1,4 +1,5 @@
 const taskInput = document.getElementById("taskInput");
+const taskDueDate = document.getElementById("taskDueDate");
 const prioritySelect = document.getElementById("prioritySelect");
 const taskForm = document.getElementById("taskForm");
 const taskList = document.getElementById("taskList");
@@ -24,6 +25,7 @@ const editModal = document.getElementById("editModal");
 const editTaskForm = document.getElementById("editTaskForm");
 const editTaskTitle = document.getElementById("editTaskTitle");
 const editTaskDescription = document.getElementById("editTaskDescription");
+const editTaskDueDate = document.getElementById("editTaskDueDate");
 const editTaskPriority = document.getElementById("editTaskPriority");
 const closeEditModal = document.getElementById("closeEditModal");
 const cancelEdit = document.getElementById("cancelEdit");
@@ -36,6 +38,28 @@ let currentUser = null;
 let confirmationSent = false;
 let confirmationRedirectInProgress = false;
 let editingTask = null;
+
+function getLocalDateKey(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getTaskStatus(task, today = getLocalDateKey()) {
+    if (task.completed || !task.dueDate) return "normal";
+    if (task.dueDate < today) return "overdue";
+    if (task.dueDate === today) return "due-today";
+    return "upcoming";
+}
+
+function formatDueDate(dueDate) {
+    if (!dueDate) return "";
+    const [year, month, day] = dueDate.split("-").map(Number);
+    return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium"
+    }).format(new Date(year, month - 1, day));
+}
 
 const config = window.SUPABASE_CONFIG;
 const supabaseClient = config?.url && config?.publishableKey && window.supabase
@@ -192,11 +216,18 @@ async function requireManualLoginAfterConfirmation() {
 }
 
 function renderTasks() {
-    const visibleTasks = tasks.filter((task) => activeFilter === "all" || (activeFilter === "completed" ? task.completed : !task.completed));
+    const today = getLocalDateKey();
+    const visibleTasks = tasks.filter((task) => {
+        const status = getTaskStatus(task, today);
+        if (activeFilter === "all") return true;
+        if (activeFilter === "completed") return task.completed;
+        return status === activeFilter;
+    });
     taskList.innerHTML = "";
     visibleTasks.forEach((task) => {
         const taskItem = document.createElement("li");
-        taskItem.className = task.completed ? "completed" : "";
+        const status = getTaskStatus(task, today);
+        taskItem.className = `${task.completed ? "completed " : ""}${status === "overdue" ? "overdue" : ""}`;
         const toggle = document.createElement("button");
         toggle.className = "check-button";
         toggle.type = "button";
@@ -209,16 +240,28 @@ function renderTasks() {
         const label = document.createElement("span");
         label.className = "task-label";
         label.textContent = task.text;
+        content.append(label);
         if (task.description) {
             const description = document.createElement("span");
             description.className = "task-description";
             description.textContent = task.description;
             content.append(description);
         }
+        if (task.dueDate) {
+            const dueDate = document.createElement("span");
+            const dueClass = status === "due-today" ? "today" : status;
+            dueDate.className = `due-date due-${dueClass}`;
+            dueDate.textContent = status === "overdue"
+                ? `Overdue · ${formatDueDate(task.dueDate)}`
+                : status === "due-today"
+                    ? "Due today"
+                    : `Due · ${formatDueDate(task.dueDate)}`;
+            content.append(dueDate);
+        }
         const priority = document.createElement("span");
         priority.className = `priority priority-${task.priority}`;
         priority.textContent = `${task.priority} priority`;
-        content.append(label, priority);
+        content.append(priority);
 
         const editButton = document.createElement("button");
         editButton.className = "edit-button";
@@ -249,7 +292,7 @@ function renderTasks() {
     document.getElementById("progressBar").style.width = total ? `${completed / total * 100}%` : "0%";
     document.getElementById("listCount").textContent = `${visibleTasks.length} ${visibleTasks.length === 1 ? "task" : "tasks"}`;
     emptyState.hidden = visibleTasks.length > 0;
-    emptyState.textContent = tasks.length && activeFilter !== "all" ? `No ${activeFilter} tasks here.` : "Your list is clear. Add a task to get started.";
+    emptyState.textContent = tasks.length && activeFilter !== "all" ? `No ${activeFilter.replace("-", " ")} tasks here.` : "Your list is clear. Add a task to get started.";
 }
 
 function mapTask(task) {
@@ -257,6 +300,7 @@ function mapTask(task) {
         id: task.id,
         text: task.text,
         description: task.description || "",
+        dueDate: task.due_date || "",
         priority: task.priority || "medium",
         completed: Boolean(task.completed)
     };
@@ -283,7 +327,13 @@ async function addTask(event) {
     setTaskLoading(true);
     showTaskError();
     showTaskMessage();
-    const { data, error } = await supabaseClient.from("Tasks").insert({ text: taskText, priority: prioritySelect.value, completed: false, user_id: currentUser.id }).select().single();
+    const { data, error } = await supabaseClient.from("Tasks").insert({
+        text: taskText,
+        priority: prioritySelect.value,
+        due_date: taskDueDate.value || null,
+        completed: false,
+        user_id: currentUser.id
+    }).select().single();
     setTaskLoading(false);
     if (error) {
         showTaskError(`Could not add task: ${error.message}`);
@@ -317,6 +367,7 @@ function openEditModal(task) {
     editingTask = task;
     editTaskTitle.value = task.text;
     editTaskDescription.value = task.description;
+    editTaskDueDate.value = task.dueDate;
     editTaskPriority.value = task.priority;
     editModal.hidden = false;
     document.body.classList.add("modal-open");
@@ -350,6 +401,7 @@ async function saveEditedTask(event) {
             .update({
                 text,
                 description: editTaskDescription.value.trim(),
+                due_date: editTaskDueDate.value || null,
                 priority: editTaskPriority.value
             })
             .eq("id", editingTask.id)
@@ -452,6 +504,9 @@ filterButtons.forEach((button) => button.addEventListener("click", () => {
     renderTasks();
 }));
 themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
+setInterval(() => {
+    if (currentUser) renderTasks();
+}, 60000);
 closeEditModal.addEventListener("click", closeEditDialog);
 cancelEdit.addEventListener("click", closeEditDialog);
 editModal.addEventListener("click", (event) => {

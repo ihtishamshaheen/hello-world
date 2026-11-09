@@ -24,6 +24,16 @@ The remote schema was not available in this repository, so the integration expec
 - `text`: task text
 - `priority`: text containing `low`, `medium`, or `high`
 - `completed`: boolean
+- `due_date`: nullable `date` containing the user's calendar deadline as `YYYY-MM-DD`
+
+The `due_date` column has been added to the live Supabase table with this migration:
+
+```sql
+alter table public."Tasks" add column if not exists due_date date;
+```
+
+No RLS policy changes were made or are required; the client continues to scope reads and writes by
+`user_id`, and existing policies should continue to enforce ownership.
 
 The client sends `user_id` from the authenticated session and also filters every read, update, and delete by `user_id`. It never disables or bypasses RLS.
 
