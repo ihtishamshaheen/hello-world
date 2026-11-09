@@ -196,6 +196,112 @@ button {
     background: #fff1ed;
 }
 
+.toast-region {
+    position: fixed;
+    z-index: 20;
+    top: 24px;
+    right: 24px;
+    display: grid;
+    width: min(390px, calc(100vw - 32px));
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 11px;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    font-size: 0.88rem;
+    line-height: 1.35;
+    pointer-events: auto;
+    animation: toast-in 180ms ease-out;
+}
+
+.toast-success {
+    border-left-color: #387052;
+}
+
+.toast-warning {
+    border-left-color: #b47713;
+}
+
+.toast-error {
+    border-left-color: #b63d26;
+}
+
+.toast-icon {
+    display: grid;
+    width: 23px;
+    height: 23px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mint);
+    color: #387052;
+    font-weight: 700;
+}
+
+.toast-warning .toast-icon {
+    background: #fff0c8;
+    color: #94620c;
+}
+
+.toast-error .toast-icon {
+    background: #ffe1d8;
+    color: #b63d26;
+}
+
+.toast-text {
+    overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.toast-dismiss:hover {
+    background: var(--mint);
+    color: var(--ink);
+}
+
+.toast-leaving {
+    animation: toast-out 180ms ease-in forwards;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toast-out {
+    to {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+}
+
 .topbar-actions {
     display: flex;
     align-items: center;
@@ -770,5 +876,12 @@ select:focus {
 
     .edit-modal {
         padding: 22px 18px;
+    }
+
+    .toast-region {
+        top: 14px;
+        right: 16px;
+        left: 16px;
+        width: auto;
     }
 }

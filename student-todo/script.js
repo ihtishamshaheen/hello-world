@@ -35,6 +35,7 @@ const editTaskPriority = document.getElementById("editTaskPriority");
 const closeEditModal = document.getElementById("closeEditModal");
 const cancelEdit = document.getElementById("cancelEdit");
 const saveEdit = document.getElementById("saveEdit");
+const toastRegion = document.getElementById("toastRegion");
 const themeKey = "studentTodoTheme";
 let activeFilter = "all";
 let searchQuery = "";
@@ -45,6 +46,7 @@ let currentUser = null;
 let confirmationSent = false;
 let confirmationRedirectInProgress = false;
 let editingTask = null;
+const activeToasts = new Set();
 
 function getLocalDateKey(date = new Date()) {
     const year = date.getFullYear();
@@ -86,6 +88,52 @@ function showTaskError(message = "") {
 function showTaskMessage(message = "") {
     taskMessage.textContent = message;
     taskMessage.hidden = !message;
+}
+
+function showToast(message, type = "success", duration = 4200) {
+    const key = `${type}:${message}`;
+    if (activeToasts.has(key)) return;
+    activeToasts.add(key);
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute("role", type === "error" ? "alert" : "status");
+
+    const icon = document.createElement("span");
+    icon.className = "toast-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = type === "success" ? "✓" : type === "warning" ? "!" : "×";
+
+    const text = document.createElement("span");
+    text.className = "toast-text";
+    text.textContent = message;
+
+    const dismiss = document.createElement("button");
+    dismiss.className = "toast-dismiss";
+    dismiss.type = "button";
+    dismiss.setAttribute("aria-label", "Dismiss notification");
+    dismiss.textContent = "×";
+
+    const removeToast = () => {
+        if (!toast.isConnected) return;
+        toast.classList.add("toast-leaving");
+        window.setTimeout(() => toast.remove(), 180);
+        activeToasts.delete(key);
+    };
+    dismiss.addEventListener("click", removeToast);
+    toast.addEventListener("animationend", (event) => {
+        if (event.animationName === "toast-in") toast.classList.add("toast-ready");
+    });
+    toast.append(icon, text, dismiss);
+    toastRegion.appendChild(toast);
+    window.setTimeout(removeToast, duration);
+}
+
+function getAuthErrorMessage(error) {
+    const message = error?.message?.toLowerCase() || "";
+    return message.includes("invalid login credentials") || message.includes("invalid credentials")
+        ? "Incorrect email or password."
+        : error?.message || "Authentication failed. Please try again.";
 }
 
 function setTaskLoading(isLoading) {
@@ -138,6 +186,7 @@ async function handleAuth(event) {
     showAuthMessage();
     if (!supabaseClient) {
         showAuthMessage("Supabase is not configured. Check config.js.");
+        showToast("Supabase is not configured. Check config.js.", "error", 6000);
         return;
     }
     setAuthLoading(true);
@@ -150,20 +199,28 @@ async function handleAuth(event) {
                 options: { emailRedirectTo: getEmailRedirectUrl() }
             });
         if (result.error) {
-            showAuthMessage(result.error.message);
+            const message = getAuthErrorMessage(result.error);
+            showAuthMessage(message);
+            showToast(message, authMode === "login" && message === "Incorrect email or password." ? "warning" : "error");
             return;
         }
         if (authMode === "signup") {
             if (result.data.session) {
                 showAuthMessage("Account created. You are now signed in.", false);
+                showToast("Registration successful. Welcome to Study Desk.");
             } else {
                 showAuthMessage(`Confirmation email sent to ${authEmail.value.trim()}. Open it and click the confirmation link, then return here to log in.`, false);
+                showToast("Registration successful. Check your email to confirm your account.", "success", 6000);
                 authPassword.value = "";
                 setConfirmationState(true);
             }
+        } else {
+            showToast("Login successful. Welcome back.");
         }
     } catch (error) {
-        showAuthMessage(`Authentication failed: ${error.message}`);
+        const message = getAuthErrorMessage(error);
+        showAuthMessage(message);
+        showToast(message, "error");
     } finally {
         setAuthLoading(false);
     }
@@ -217,6 +274,7 @@ async function requireManualLoginAfterConfirmation() {
         clearEmailConfirmationRedirect();
         showAuth();
         showAuthMessage("Email confirmed. Please enter your email and password to log in.", false);
+        showToast("Email confirmed. Please log in to continue.");
     } finally {
         confirmationRedirectInProgress = false;
     }
@@ -332,14 +390,21 @@ async function loadTasks() {
     if (!currentUser) return;
     setTaskLoading(true);
     showTaskError();
-    const { data, error } = await supabaseClient.from("Tasks").select("*").eq("user_id", currentUser.id);
-    setTaskLoading(false);
-    if (error) {
+    try {
+        const { data, error } = await supabaseClient.from("Tasks").select("*").eq("user_id", currentUser.id);
+        if (error) {
+            showTaskError(`Could not load tasks: ${error.message}`);
+            showToast(`Could not load tasks: ${error.message}`, "error");
+            return;
+        }
+        tasks = data.map(mapTask);
+        renderTasks();
+    } catch (error) {
         showTaskError(`Could not load tasks: ${error.message}`);
-        return;
+        showToast(`Could not load tasks: ${error.message}`, "error");
+    } finally {
+        setTaskLoading(false);
     }
-    tasks = data.map(mapTask);
-    renderTasks();
 }
 
 async function addTask(event) {
@@ -349,41 +414,69 @@ async function addTask(event) {
     setTaskLoading(true);
     showTaskError();
     showTaskMessage();
-    const { data, error } = await supabaseClient.from("Tasks").insert({
-        text: taskText,
-        priority: prioritySelect.value,
-        due_date: taskDueDate.value || null,
-        category: taskCategory.value,
-        completed: false,
-        user_id: currentUser.id
-    }).select().single();
-    setTaskLoading(false);
-    if (error) {
-        showTaskError(`Could not add task: ${error.message}`);
-        return;
+    try {
+        const { data, error } = await supabaseClient.from("Tasks").insert({
+            text: taskText,
+            priority: prioritySelect.value,
+            due_date: taskDueDate.value || null,
+            category: taskCategory.value,
+            completed: false,
+            user_id: currentUser.id
+        }).select().single();
+        if (error) {
+            showTaskError(`Could not add task: ${error.message}`);
+            showToast(`Could not create task: ${error.message}`, "error");
+            return;
+        }
+        tasks.unshift(mapTask(data));
+        renderTasks();
+        taskForm.reset();
+        taskInput.focus();
+        showToast("Task created successfully.");
+    } catch (error) {
+        showTaskError(`Could not create task: ${error.message}`);
+        showToast(`Could not create task: ${error.message}`, "error");
+    } finally {
+        setTaskLoading(false);
     }
-    tasks.unshift(mapTask(data));
-    renderTasks();
-    taskForm.reset();
-    taskInput.focus();
 }
 
 async function toggleTask(id, completed) {
     showTaskError();
     showTaskMessage();
-    const { error } = await supabaseClient.from("Tasks").update({ completed: !completed }).eq("id", id).eq("user_id", currentUser.id);
-    if (error) { showTaskError(`Could not update task: ${error.message}`); return; }
-    tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
-    renderTasks();
+    try {
+        const { error } = await supabaseClient.from("Tasks").update({ completed: !completed }).eq("id", id).eq("user_id", currentUser.id);
+        if (error) {
+            showTaskError(`Could not update task: ${error.message}`);
+            showToast(`Could not update task: ${error.message}`, "error");
+            return;
+        }
+        tasks = tasks.map((task) => task.id === id ? { ...task, completed: !completed } : task);
+        renderTasks();
+        showToast(completed ? "Task marked incomplete." : "Task marked completed.");
+    } catch (error) {
+        showTaskError(`Could not update task: ${error.message}`);
+        showToast(`Could not update task: ${error.message}`, "error");
+    }
 }
 
 async function deleteTask(id) {
     showTaskError();
     showTaskMessage();
-    const { error } = await supabaseClient.from("Tasks").delete().eq("id", id).eq("user_id", currentUser.id);
-    if (error) { showTaskError(`Could not delete task: ${error.message}`); return; }
-    tasks = tasks.filter((task) => task.id !== id);
-    renderTasks();
+    try {
+        const { error } = await supabaseClient.from("Tasks").delete().eq("id", id).eq("user_id", currentUser.id);
+        if (error) {
+            showTaskError(`Could not delete task: ${error.message}`);
+            showToast(`Could not delete task: ${error.message}`, "error");
+            return;
+        }
+        tasks = tasks.filter((task) => task.id !== id);
+        renderTasks();
+        showToast("Task deleted successfully.");
+    } catch (error) {
+        showTaskError(`Could not delete task: ${error.message}`);
+        showToast(`Could not delete task: ${error.message}`, "error");
+    }
 }
 
 function openEditModal(task) {
@@ -435,6 +528,7 @@ async function saveEditedTask(event) {
             .single());
     } catch (requestError) {
         showTaskError(`Could not update task: ${requestError.message}`);
+        showToast(`Could not update task: ${requestError.message}`, "error");
         return;
     } finally {
         saveEdit.disabled = false;
@@ -442,12 +536,14 @@ async function saveEditedTask(event) {
 
     if (error) {
         showTaskError(`Could not update task: ${error.message}`);
+        showToast(`Could not update task: ${error.message}`, "error");
         return;
     }
     tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
     closeEditDialog();
     renderTasks();
     showTaskMessage("Task updated successfully.");
+    showToast("Task updated successfully.");
 }
 
 function setTheme(theme) {
@@ -475,6 +571,7 @@ async function initialize() {
     if (!supabaseClient) {
         configMessage.hidden = false;
         authSubmit.disabled = true;
+        showToast("Supabase is not configured. Check config.js.", "error", 6000);
         return;
     }
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -484,6 +581,7 @@ async function initialize() {
         } catch (error) {
             showAuth();
             showAuthMessage(`Could not prepare the login screen: ${error.message}`);
+            showToast(`Could not prepare the login screen: ${error.message}`, "error");
         }
     } else if (session?.user) {
         showApp(session.user);
@@ -516,9 +614,13 @@ logoutButton.addEventListener("click", async () => {
     logoutButton.disabled = true;
     try {
         const { error } = await supabaseClient.auth.signOut();
-        if (error) showTaskError(`Could not log out: ${error.message}`);
+        if (error) {
+            showTaskError(`Could not log out: ${error.message}`);
+            showToast(`Could not log out: ${error.message}`, "error");
+        }
     } catch (error) {
         showTaskError(`Could not log out: ${error.message}`);
+        showToast(`Could not log out: ${error.message}`, "error");
     } finally {
         logoutButton.disabled = false;
     }
