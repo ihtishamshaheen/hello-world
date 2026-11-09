@@ -98,6 +98,15 @@ The unique constraint prevents duplicate activity rows for the same user and dat
 The client uses the browser's local date for activity events and scopes every query
 by the authenticated user's ID.
 
+## Study analytics
+
+The Analytics view supports weekly and monthly ranges. Task metrics include tasks
+whose due date falls in the selected range; tasks without a due date use their
+Supabase `created_at` date. Completed-task chart buckets use that same task date
+because the existing `Tasks` schema does not store a separate completion timestamp.
+Pomodoro counts use the authenticated user's `FocusSessions.completed_at` values,
+and streak statistics use the user's `StudyActivity` dates.
+
 The client sends `user_id` from the authenticated session and also filters every read, update, and delete by `user_id`. It never disables or bypasses RLS.
 
 Before deployment, verify in Supabase Table Editor or SQL Editor that:

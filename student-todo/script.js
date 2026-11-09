@@ -50,6 +50,18 @@ const agendaEmpty = document.getElementById("agendaEmpty");
 const addForDate = document.getElementById("addForDate");
 const focusViewTab = document.getElementById("focusViewTab");
 const focusPanel = document.getElementById("focusPanel");
+const analyticsViewTab = document.getElementById("analyticsViewTab");
+const analyticsPanel = document.getElementById("analyticsPanel");
+const weeklyAnalytics = document.getElementById("weeklyAnalytics");
+const monthlyAnalytics = document.getElementById("monthlyAnalytics");
+const analyticsLoading = document.getElementById("analyticsLoading");
+const analyticsEmpty = document.getElementById("analyticsEmpty");
+const analyticsContent = document.getElementById("analyticsContent");
+const completionChart = document.getElementById("completionChart");
+const categoryChart = document.getElementById("categoryChart");
+const analyticsFocusSessions = document.getElementById("analyticsFocusSessions");
+const analyticsCurrentStreak = document.getElementById("analyticsCurrentStreak");
+const analyticsLongestStreak = document.getElementById("analyticsLongestStreak");
 const focusTaskLabel = document.getElementById("focusTaskLabel");
 const focusSessionCount = document.getElementById("focusSessionCount");
 const timerRing = document.getElementById("timerRing");
@@ -80,6 +92,8 @@ let editingTask = null;
 let calendarWeekOffset = 0;
 let selectedCalendarDate = getLocalDateKey();
 let activeView = "tasks";
+let analyticsPeriod = "weekly";
+let analyticsRequestId = 0;
 const activeToasts = new Set();
 let focusMode = "focus";
 let focusSecondsRemaining = 25 * 60;
@@ -189,6 +203,141 @@ function renderStudyStreak() {
     });
 }
 
+function getAnalyticsRange() {
+    const today = parseLocalDate(getLocalDateKey());
+    if (analyticsPeriod === "weekly") {
+        const dates = getCurrentWeekDates();
+        const start = parseLocalDate(dates[0]);
+        const end = parseLocalDate(dates[6]);
+        end.setDate(end.getDate() + 1);
+        return { start, end, dates };
+    }
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const dates = [];
+    for (const cursor = new Date(start); cursor < end; cursor.setDate(cursor.getDate() + 1)) {
+        dates.push(getLocalDateKey(cursor));
+    }
+    return { start, end, dates };
+}
+
+function isDateInRange(dateKey, range) {
+    return !dateKey || (dateKey >= getLocalDateKey(range.start) && dateKey < getLocalDateKey(range.end));
+}
+
+function getTaskAnalyticsDate(task) {
+    return task.dueDate || (task.createdAt ? task.createdAt.slice(0, 10) : "");
+}
+
+function createAnalyticsBar(label, value, maximum, className = "") {
+    const item = document.createElement("div");
+    item.className = `chart-bar-item ${className}`;
+    const barLabel = document.createElement("span");
+    barLabel.textContent = label;
+    const track = document.createElement("span");
+    track.className = "chart-bar-track";
+    const bar = document.createElement("span");
+    bar.className = "chart-bar";
+    bar.style.height = `${maximum ? Math.max(4, value / maximum * 100) : 4}%`;
+    bar.title = `${value} completed`;
+    track.appendChild(bar);
+    const count = document.createElement("strong");
+    count.textContent = value;
+    item.append(barLabel, track, count);
+    return item;
+}
+
+function renderAnalyticsCharts(range, periodTasks) {
+    const completionCounts = range.dates.map((date) => periodTasks
+        .filter((task) => task.completed && getTaskAnalyticsDate(task) === date).length);
+    const chartBuckets = analyticsPeriod === "weekly"
+        ? completionCounts
+        : Array.from({ length: 5 }, (_, index) => completionCounts
+            .slice(index * 7, (index + 1) * 7)
+            .reduce((sum, value) => sum + value, 0));
+    const labels = analyticsPeriod === "weekly"
+        ? range.dates.map((date) => new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(parseLocalDate(date)))
+        : ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"];
+    const maximum = Math.max(...chartBuckets, 0);
+    completionChart.innerHTML = "";
+    chartBuckets.forEach((value, index) => {
+        completionChart.appendChild(createAnalyticsBar(labels[index], value, maximum));
+    });
+
+    const categoryCounts = new Map();
+    periodTasks.forEach((task) => categoryCounts.set(task.category, (categoryCounts.get(task.category) || 0) + 1));
+    const categories = [...categoryCounts.entries()].sort((first, second) => second[1] - first[1]);
+    const categoryMaximum = Math.max(...categories.map(([, value]) => value), 0);
+    categoryChart.innerHTML = "";
+    categories.forEach(([category, value]) => {
+        const item = document.createElement("div");
+        item.className = "category-chart-item";
+        const label = document.createElement("span");
+        label.textContent = category;
+        const track = document.createElement("span");
+        track.className = "category-track";
+        const bar = document.createElement("span");
+        bar.style.width = `${categoryMaximum ? value / categoryMaximum * 100 : 0}%`;
+        track.appendChild(bar);
+        const count = document.createElement("strong");
+        count.textContent = value;
+        item.append(label, track, count);
+        categoryChart.appendChild(item);
+    });
+}
+
+async function loadAnalytics() {
+    if (!currentUser) return;
+    const requestId = ++analyticsRequestId;
+    const range = getAnalyticsRange();
+    analyticsLoading.hidden = false;
+    analyticsEmpty.hidden = true;
+    analyticsContent.hidden = true;
+    try {
+        const startIso = range.start.toISOString();
+        const endIso = range.end.toISOString();
+        const { data: sessions, error } = await supabaseClient
+            .from("FocusSessions")
+            .select("id,completed_at")
+            .eq("user_id", currentUser.id)
+            .gte("completed_at", startIso)
+            .lt("completed_at", endIso);
+        if (error) throw error;
+        if (requestId !== analyticsRequestId) return;
+
+        const periodTasks = tasks.filter((task) => isDateInRange(getTaskAnalyticsDate(task), range));
+        const completed = periodTasks.filter((task) => task.completed).length;
+        const pending = periodTasks.length - completed;
+        const overdue = periodTasks.filter((task) => getTaskStatus(task) === "overdue").length;
+        document.getElementById("analyticsTotal").textContent = periodTasks.length;
+        document.getElementById("analyticsCompleted").textContent = completed;
+        document.getElementById("analyticsPending").textContent = pending;
+        document.getElementById("analyticsOverdue").textContent = overdue;
+        document.getElementById("analyticsPercentage").textContent = periodTasks.length
+            ? `${Math.round(completed / periodTasks.length * 100)}%`
+            : "0%";
+        analyticsFocusSessions.textContent = sessions.length;
+        const streaks = calculateStreaks(studyActivityDates);
+        analyticsCurrentStreak.textContent = streaks.current;
+        analyticsLongestStreak.textContent = streaks.longest;
+        renderAnalyticsCharts(range, periodTasks);
+        const hasData = periodTasks.length > 0 || sessions.length > 0
+            || studyActivityDates.some((date) => isDateInRange(date, range));
+        analyticsEmpty.hidden = hasData;
+        analyticsContent.hidden = !hasData;
+    } catch (error) {
+        showToast(`Could not load analytics: ${error.message}`, "error");
+        analyticsEmpty.textContent = "Analytics could not be loaded. Please try again.";
+        analyticsEmpty.hidden = false;
+    } finally {
+        if (requestId === analyticsRequestId) analyticsLoading.hidden = true;
+    }
+}
+
+function refreshAnalyticsIfVisible() {
+    if (activeView === "analytics") loadAnalytics();
+}
+
 async function loadStudyActivity() {
     if (!currentUser) return;
     try {
@@ -201,6 +350,7 @@ async function loadStudyActivity() {
         if (error) throw error;
         studyActivityDates = data.map((row) => row.activity_date);
         renderStudyStreak();
+        refreshAnalyticsIfVisible();
     } catch (error) {
         showToast(`Could not load study streak: ${error.message}`, "error");
     }
@@ -235,17 +385,22 @@ function setActiveView(view) {
     activeView = view;
     const showPlanner = view === "planner";
     const showFocus = view === "focus";
-    taskPanel.hidden = showPlanner || showFocus;
+    const showAnalytics = view === "analytics";
+    taskPanel.hidden = showPlanner || showFocus || showAnalytics;
     plannerPanel.hidden = !showPlanner;
     focusPanel.hidden = !showFocus;
+    analyticsPanel.hidden = !showAnalytics;
     tasksViewTab.classList.toggle("active", view === "tasks");
     plannerViewTab.classList.toggle("active", showPlanner);
     focusViewTab.classList.toggle("active", showFocus);
+    analyticsViewTab.classList.toggle("active", showAnalytics);
     tasksViewTab.setAttribute("aria-selected", String(view === "tasks"));
     plannerViewTab.setAttribute("aria-selected", String(showPlanner));
     focusViewTab.setAttribute("aria-selected", String(showFocus));
+    analyticsViewTab.setAttribute("aria-selected", String(showAnalytics));
     if (showPlanner) renderPlanner();
     if (showFocus) renderFocusTaskOptions();
+    if (showAnalytics) loadAnalytics();
 }
 
 function getFocusDurationSeconds() {
@@ -322,6 +477,7 @@ async function saveCompletedFocusSession() {
     completedFocusSessions += 1;
     focusSessionCount.textContent = completedFocusSessions;
     await recordStudyActivity();
+    refreshAnalyticsIfVisible();
 }
 
 async function finishTimerSession() {
@@ -764,7 +920,8 @@ function mapTask(task) {
         dueDate: task.due_date || "",
         category: task.category || "Other",
         priority: task.priority || "medium",
-        completed: Boolean(task.completed)
+        completed: Boolean(task.completed),
+        createdAt: task.created_at || ""
     };
 }
 
@@ -785,6 +942,7 @@ async function loadTasks() {
         if (activeView === "planner") renderPlanner();
         loadFocusSessionCount();
         loadStudyActivity();
+        loadAnalytics();
     } catch (error) {
         showTaskError(`Could not load tasks: ${error.message}`);
         showToast(`Could not load tasks: ${error.message}`, "error");
@@ -816,6 +974,7 @@ async function addTask(event) {
         }
         tasks.unshift(mapTask(data));
         renderTasks();
+        refreshAnalyticsIfVisible();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         taskForm.reset();
@@ -850,6 +1009,7 @@ async function toggleTask(id, completed) {
                 showToast(`Task completed, but study activity could not be saved: ${activityError.message}`, "error");
             }
         }
+        refreshAnalyticsIfVisible();
         showToast(completed ? "Task marked incomplete." : "Task marked completed.");
     } catch (error) {
         showTaskError(`Could not update task: ${error.message}`);
@@ -869,6 +1029,7 @@ async function deleteTask(id) {
         }
         tasks = tasks.filter((task) => task.id !== id);
         renderTasks();
+        refreshAnalyticsIfVisible();
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         showToast("Task deleted successfully.");
@@ -941,6 +1102,7 @@ async function saveEditedTask(event) {
     tasks = tasks.map((task) => task.id === editingTask.id ? mapTask(data) : task);
     closeEditDialog();
     renderTasks();
+    refreshAnalyticsIfVisible();
     renderFocusTaskOptions();
     if (activeView === "planner") renderPlanner();
     showTaskMessage("Task updated successfully.");
@@ -1051,6 +1213,19 @@ themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme
 tasksViewTab.addEventListener("click", () => setActiveView("tasks"));
 plannerViewTab.addEventListener("click", () => setActiveView("planner"));
 focusViewTab.addEventListener("click", () => setActiveView("focus"));
+analyticsViewTab.addEventListener("click", () => setActiveView("analytics"));
+weeklyAnalytics.addEventListener("click", () => {
+    analyticsPeriod = "weekly";
+    weeklyAnalytics.classList.add("active");
+    monthlyAnalytics.classList.remove("active");
+    loadAnalytics();
+});
+monthlyAnalytics.addEventListener("click", () => {
+    analyticsPeriod = "monthly";
+    monthlyAnalytics.classList.add("active");
+    weeklyAnalytics.classList.remove("active");
+    loadAnalytics();
+});
 previousWeek.addEventListener("click", () => {
     calendarWeekOffset -= 1;
     selectedCalendarDate = getWeekDates()[0];

@@ -95,6 +95,7 @@
             <button class="view-tab active" id="tasksViewTab" type="button" aria-selected="true">Task list</button>
             <button class="view-tab" id="plannerViewTab" type="button" aria-selected="false">Study planner</button>
             <button class="view-tab" id="focusViewTab" type="button" aria-selected="false">Focus timer</button>
+            <button class="view-tab" id="analyticsViewTab" type="button" aria-selected="false">Analytics</button>
         </nav>
 
         <section class="task-panel" aria-labelledby="tasks-heading">
@@ -226,6 +227,49 @@
                     <input id="longBreakDuration" type="number" min="1" max="120" value="15" required>
                     <button class="calendar-button" type="submit">Apply durations</button>
                 </form>
+            </div>
+        </section>
+
+        <section class="analytics-panel" id="analyticsPanel" aria-labelledby="analytics-heading" hidden>
+            <div class="panel-heading analytics-heading">
+                <div>
+                    <span class="section-label">YOUR INSIGHTS</span>
+                    <h2 id="analytics-heading">Study analytics</h2>
+                </div>
+                <div class="analytics-period" role="group" aria-label="Analytics period">
+                    <button class="filter-button active" id="weeklyAnalytics" type="button">Weekly</button>
+                    <button class="filter-button" id="monthlyAnalytics" type="button">Monthly</button>
+                </div>
+            </div>
+            <p class="loading-state" id="analyticsLoading" hidden>Loading your analytics...</p>
+            <p class="empty-state" id="analyticsEmpty" hidden>No study data is available for this period yet.</p>
+            <div id="analyticsContent">
+                <div class="analytics-stats">
+                    <div class="analytics-stat"><strong id="analyticsTotal">0</strong><span>Total tasks</span></div>
+                    <div class="analytics-stat"><strong id="analyticsCompleted">0</strong><span>Completed</span></div>
+                    <div class="analytics-stat"><strong id="analyticsPending">0</strong><span>Pending</span></div>
+                    <div class="analytics-stat"><strong id="analyticsOverdue">0</strong><span>Overdue</span></div>
+                    <div class="analytics-stat"><strong id="analyticsPercentage">0%</strong><span>Completion</span></div>
+                    <div class="analytics-stat"><strong id="analyticsFocusSessions">0</strong><span>Pomodoro sessions</span></div>
+                </div>
+                <div class="analytics-charts">
+                    <section class="chart-card" aria-labelledby="completion-chart-heading">
+                        <h3 id="completion-chart-heading">Task completion</h3>
+                        <div class="bar-chart" id="completionChart"></div>
+                    </section>
+                    <section class="chart-card" aria-labelledby="category-chart-heading">
+                        <h3 id="category-chart-heading">Categories</h3>
+                        <div class="category-chart" id="categoryChart"></div>
+                    </section>
+                </div>
+                <section class="analytics-streak" aria-labelledby="analytics-streak-heading">
+                    <div>
+                        <span class="section-label">CONSISTENCY</span>
+                        <h3 id="analytics-streak-heading">Study streak</h3>
+                    </div>
+                    <div><strong id="analyticsCurrentStreak">0</strong><span> current days</span></div>
+                    <div><strong id="analyticsLongestStreak">0</strong><span> longest days</span></div>
+                </section>
             </div>
         </section>
     </main>
