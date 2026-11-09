@@ -1,5 +1,11 @@
 const taskInput = document.getElementById("taskInput");
 const taskDueDate = document.getElementById("taskDueDate");
+const taskDueTime = document.getElementById("taskDueTime");
+const taskReminderEnabled = document.getElementById("taskReminderEnabled");
+const taskReminderOptions = document.getElementById("taskReminderOptions");
+const taskRecurrence = document.getElementById("taskRecurrence");
+const taskRecurrenceInterval = document.getElementById("taskRecurrenceInterval");
+const taskRecurrenceEndDate = document.getElementById("taskRecurrenceEndDate");
 const taskCategory = document.getElementById("taskCategory");
 const prioritySelect = document.getElementById("prioritySelect");
 const taskForm = document.getElementById("taskForm");
@@ -30,6 +36,13 @@ const editTaskForm = document.getElementById("editTaskForm");
 const editTaskTitle = document.getElementById("editTaskTitle");
 const editTaskDescription = document.getElementById("editTaskDescription");
 const editTaskDueDate = document.getElementById("editTaskDueDate");
+const editTaskDueTime = document.getElementById("editTaskDueTime");
+const editTaskReminderEnabled = document.getElementById("editTaskReminderEnabled");
+const editTaskReminderOptions = document.getElementById("editTaskReminderOptions");
+const editTaskRecurrence = document.getElementById("editTaskRecurrence");
+const editTaskRecurrenceInterval = document.getElementById("editTaskRecurrenceInterval");
+const editTaskRecurrenceEndDate = document.getElementById("editTaskRecurrenceEndDate");
+const editTaskRecurrenceActive = document.getElementById("editTaskRecurrenceActive");
 const editTaskCategory = document.getElementById("editTaskCategory");
 const editTaskPriority = document.getElementById("editTaskPriority");
 const closeEditModal = document.getElementById("closeEditModal");
@@ -1140,12 +1153,55 @@ function renderTasks() {
     renderDashboardSections();
 }
 
+function getSelectedValues(select) {
+    return Array.from(select.selectedOptions).map((option) => option.value);
+}
+
+function getDueAt(dateInput, timeInput) {
+    if (!dateInput || !timeInput) return null;
+    const localDate = new Date(`${dateInput}T${timeInput}`);
+    return Number.isNaN(localDate.getTime()) ? null : localDate.toISOString();
+}
+
+function getRecurrenceRule(select, intervalInput) {
+    if (select.value === "none") return null;
+    return {
+        frequency: select.value,
+        interval: Math.max(1, Number(intervalInput.value) || 1)
+    };
+}
+
+function setRecurrenceControls(select, intervalInput, endDateInput) {
+    const recurring = select.value !== "none";
+    intervalInput.hidden = !recurring;
+    endDateInput.hidden = !recurring;
+}
+
+function setReminderControls(enabledInput, optionsInput) {
+    optionsInput.disabled = !enabledInput.checked;
+}
+
+function getLocalTimeFromIso(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? ""
+        : `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 function mapTask(task) {
     return {
         id: task.id,
         text: task.text,
         description: task.description || "",
         dueDate: task.due_date || "",
+        dueAt: task.due_at || "",
+        reminderEnabled: Boolean(task.reminder_enabled),
+        reminderOptions: task.reminder_options || [],
+        recurrenceRule: task.recurrence_rule || null,
+        recurrenceEndDate: task.recurrence_end_date || "",
+        recurrenceActive: Boolean(task.recurrence_active),
+        recurrenceSeriesId: task.recurrence_series_id || "",
         category: task.category || "Other",
         priority: task.priority || "medium",
         completed: Boolean(task.completed),
@@ -1193,6 +1249,12 @@ async function addTask(event) {
             text: taskText,
             priority: prioritySelect.value,
             due_date: taskDueDate.value || null,
+            due_at: getDueAt(taskDueDate.value, taskDueTime.value || (taskRecurrence.value !== "none" ? "00:00" : "")),
+            reminder_enabled: taskReminderEnabled.checked && Boolean(taskDueTime.value),
+            reminder_options: taskReminderEnabled.checked ? getSelectedValues(taskReminderOptions) : [],
+            recurrence_rule: getRecurrenceRule(taskRecurrence, taskRecurrenceInterval),
+            recurrence_end_date: taskRecurrence.value === "none" ? null : taskRecurrenceEndDate.value || null,
+            recurrence_active: taskRecurrence.value !== "none",
             category: taskCategory.value,
             completed: false,
             status: "todo",
@@ -1209,6 +1271,8 @@ async function addTask(event) {
         renderFocusTaskOptions();
         if (activeView === "planner") renderPlanner();
         taskForm.reset();
+        setRecurrenceControls(taskRecurrence, taskRecurrenceInterval, taskRecurrenceEndDate);
+        setReminderControls(taskReminderEnabled, taskReminderOptions);
         taskInput.focus();
         showToast("Task created successfully.");
     } catch (error) {
@@ -1283,6 +1347,17 @@ function openEditModal(task) {
     editTaskTitle.value = task.text;
     editTaskDescription.value = task.description;
     editTaskDueDate.value = task.dueDate;
+    editTaskDueTime.value = getLocalTimeFromIso(task.dueAt);
+    editTaskReminderEnabled.checked = task.reminderEnabled;
+    Array.from(editTaskReminderOptions.options).forEach((option) => {
+        option.selected = task.reminderOptions.includes(option.value);
+    });
+    editTaskRecurrence.value = task.recurrenceRule?.frequency || "none";
+    editTaskRecurrenceInterval.value = task.recurrenceRule?.interval || 1;
+    editTaskRecurrenceEndDate.value = task.recurrenceEndDate;
+    editTaskRecurrenceActive.checked = task.recurrenceActive;
+    setRecurrenceControls(editTaskRecurrence, editTaskRecurrenceInterval, editTaskRecurrenceEndDate);
+    setReminderControls(editTaskReminderEnabled, editTaskReminderOptions);
     editTaskCategory.value = task.category;
     editTaskPriority.value = task.priority;
     editModal.hidden = false;
@@ -1318,6 +1393,12 @@ async function saveEditedTask(event) {
                 text,
                 description: editTaskDescription.value.trim(),
                 due_date: editTaskDueDate.value || null,
+                due_at: getDueAt(editTaskDueDate.value, editTaskDueTime.value || (editTaskRecurrence.value !== "none" ? "00:00" : "")),
+                reminder_enabled: editTaskReminderEnabled.checked && Boolean(editTaskDueTime.value),
+                reminder_options: editTaskReminderEnabled.checked ? getSelectedValues(editTaskReminderOptions) : [],
+                recurrence_rule: getRecurrenceRule(editTaskRecurrence, editTaskRecurrenceInterval),
+                recurrence_end_date: editTaskRecurrence.value === "none" ? null : editTaskRecurrenceEndDate.value || null,
+                recurrence_active: editTaskRecurrence.value !== "none" && editTaskRecurrenceActive.checked,
                 category: editTaskCategory.value,
                 priority: editTaskPriority.value
             })
@@ -1498,6 +1579,20 @@ addForDate.addEventListener("click", () => {
     taskInput.focus();
     showToast(`New task due ${formatDueDate(selectedCalendarDate)}.`);
 });
+taskRecurrence.addEventListener("change", () => {
+    setRecurrenceControls(taskRecurrence, taskRecurrenceInterval, taskRecurrenceEndDate);
+});
+editTaskRecurrence.addEventListener("change", () => {
+    setRecurrenceControls(editTaskRecurrence, editTaskRecurrenceInterval, editTaskRecurrenceEndDate);
+});
+taskReminderEnabled.addEventListener("change", () => {
+    setReminderControls(taskReminderEnabled, taskReminderOptions);
+});
+editTaskReminderEnabled.addEventListener("change", () => {
+    setReminderControls(editTaskReminderEnabled, editTaskReminderOptions);
+});
+setRecurrenceControls(taskRecurrence, taskRecurrenceInterval, taskRecurrenceEndDate);
+setReminderControls(taskReminderEnabled, taskReminderOptions);
 timerStart.addEventListener("click", runFocusTimer);
 timerPause.addEventListener("click", pauseFocusTimer);
 timerReset.addEventListener("click", resetFocusTimer);

@@ -177,3 +177,32 @@ Remove-Item student-todo/config.js
 ```
 
 Use Vercel environment variables for the URL and Publishable key. Never use `SUPABASE_SERVICE_ROLE_KEY` or a Secret key in the browser or deployment output.
+
+## Email reminders and recurring tasks
+
+The migration in
+[`supabase/migrations/20261109204500_email_reminders_recurring_tasks.sql`](supabase/migrations/20261109204500_email_reminders_recurring_tasks.sql)
+adds deadline timestamps, reminder preferences, recurrence metadata, and the
+server-only delivery ledger. Apply it in the Supabase SQL Editor after
+verifying that `Tasks.id` is a UUID. Existing date-only tasks continue to work.
+
+Deploy the two Edge Functions with the Supabase CLI:
+
+```powershell
+supabase functions deploy send-task-reminders
+supabase functions deploy generate-recurring-tasks
+```
+
+Set these Edge Function secrets in the Supabase dashboard or with
+`supabase secrets set`:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` (a verified Resend sender)
+
+Configure scheduled invocations for `send-task-reminders` every minute and
+`generate-recurring-tasks` at least hourly. The functions use the service-role
+key only on the server, claim reminder rows with a database uniqueness guard,
+and generate recurrence instances with the same guard. Do not put any of these
+secrets in `config.js`, frontend JavaScript, or the repository.

@@ -43,6 +43,22 @@ select {
     font: inherit;
 }
 
+.inline-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
+.inline-option input {
+    width: auto;
+}
+
+.task-options select {
+    min-height: 72px;
+}
+
 button {
     cursor: pointer;
 }

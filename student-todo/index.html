@@ -140,6 +140,28 @@
                     autocomplete="off">
                 <label class="sr-only" for="taskDueDate">Due date</label>
                 <input type="date" id="taskDueDate" aria-label="Task due date">
+                <label class="sr-only" for="taskDueTime">Due time</label>
+                <input type="time" id="taskDueTime" aria-label="Task due time">
+                <label class="inline-option"><input type="checkbox" id="taskReminderEnabled"> Email reminders</label>
+                <div class="task-options">
+                    <label class="sr-only" for="taskReminderOptions">Reminder timing</label>
+                    <select id="taskReminderOptions" multiple aria-label="Reminder timing">
+                        <option value="one_day">1 day before</option>
+                        <option value="one_hour">1 hour before</option>
+                        <option value="at_deadline">At the deadline</option>
+                    </select>
+                </div>
+                <label class="sr-only" for="taskRecurrence">Recurrence</label>
+                <select id="taskRecurrence" aria-label="Recurrence">
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom recurrence</option>
+                </select>
+                <input type="number" id="taskRecurrenceInterval" min="1" max="365" value="1"
+                    aria-label="Repeat every number of intervals" hidden>
+                <input type="date" id="taskRecurrenceEndDate" aria-label="Recurrence end date" hidden>
                 <label class="sr-only" for="taskCategory">Task category</label>
                 <select id="taskCategory" aria-label="Task category">
                     <option value="University">University</option>
@@ -365,6 +387,28 @@
                     placeholder="Add a little more detail"></textarea>
                 <label for="editTaskDueDate">Due date</label>
                 <input id="editTaskDueDate" type="date">
+                <label for="editTaskDueTime">Due time</label>
+                <input id="editTaskDueTime" type="time">
+                <label class="inline-option"><input type="checkbox" id="editTaskReminderEnabled"> Email reminders</label>
+                <label for="editTaskReminderOptions">Reminder timing</label>
+                <select id="editTaskReminderOptions" multiple>
+                    <option value="one_day">1 day before</option>
+                    <option value="one_hour">1 hour before</option>
+                    <option value="at_deadline">At the deadline</option>
+                </select>
+                <label for="editTaskRecurrence">Recurrence</label>
+                <select id="editTaskRecurrence">
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom recurrence</option>
+                </select>
+                <input type="number" id="editTaskRecurrenceInterval" min="1" max="365" value="1"
+                    aria-label="Repeat every number of intervals" hidden>
+                <label for="editTaskRecurrenceEndDate">Recurrence end date</label>
+                <input id="editTaskRecurrenceEndDate" type="date" hidden>
+                <label class="inline-option"><input type="checkbox" id="editTaskRecurrenceActive"> Recurrence active</label>
                 <label for="editTaskCategory">Category</label>
                 <select id="editTaskCategory">
                     <option value="University">University</option>
