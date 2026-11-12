@@ -22,6 +22,8 @@ const themeToggle = document.getElementById("themeToggle");
 const authShell = document.getElementById("authShell");
 const appShell = document.getElementById("appShell");
 const authForm = document.getElementById("authForm");
+const authFullName = document.getElementById("authFullName");
+const authFullNameLabel = document.getElementById("authFullNameLabel");
 const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
 const passwordToggle = document.getElementById("passwordToggle");
@@ -994,6 +996,9 @@ function setAuthMode(mode) {
     signupTab.setAttribute("aria-selected", !isLogin);
     authSubmit.textContent = isLogin ? "Log in" : "Create account";
     authPassword.autocomplete = isLogin ? "current-password" : "new-password";
+    authFullName.hidden = isLogin;
+    authFullNameLabel.hidden = isLogin;
+    authFullName.required = !isLogin;
     showAuthMessage();
 }
 
@@ -1008,6 +1013,7 @@ function setConfirmationState(isSent) {
     confirmationSent = isSent;
     if (isSent) resetPasswordVisibility();
     authEmail.disabled = isSent;
+    authFullName.disabled = isSent;
     authPassword.disabled = isSent;
     passwordToggle.disabled = isSent;
     loginTab.disabled = isSent;
@@ -1033,12 +1039,21 @@ async function handleAuth(event) {
     }
     setAuthLoading(true);
     try {
+        const fullName = authFullName.value.trim();
+        if (authMode === "signup" && !fullName) {
+            showAuthMessage("Please enter your full name.");
+            authFullName.focus();
+            return;
+        }
         const result = authMode === "login"
             ? await supabaseClient.auth.signInWithPassword({ email: authEmail.value.trim(), password: authPassword.value })
             : await supabaseClient.auth.signUp({
                 email: authEmail.value.trim(),
                 password: authPassword.value,
-                options: { emailRedirectTo: getEmailRedirectUrl() }
+                options: {
+                    emailRedirectTo: getEmailRedirectUrl(),
+                    data: { full_name: fullName }
+                }
             });
         if (result.error) {
             const message = getAuthErrorMessage(result.error);
