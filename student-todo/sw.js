@@ -1,4 +1,4 @@
-const CACHE_NAME = "study-desk-static-v1";
+const CACHE_NAME = "study-desk-static-v2";
 const SUPABASE_CLIENT_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 const STATIC_ASSETS = [
     "./",

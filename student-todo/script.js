@@ -998,6 +998,8 @@ function setAuthMode(mode) {
     authPassword.autocomplete = isLogin ? "current-password" : "new-password";
     authFullName.hidden = isLogin;
     authFullNameLabel.hidden = isLogin;
+    authFullName.style.display = isLogin ? "none" : "";
+    authFullNameLabel.style.display = isLogin ? "none" : "";
     authFullName.required = !isLogin;
     showAuthMessage();
 }
