@@ -1236,10 +1236,7 @@ function getDueAt(dateInput, timeInput) {
 
 function getRecurrenceRule(select, intervalInput) {
     if (select.value === "none") return null;
-    return {
-        frequency: select.value,
-        interval: Math.max(1, Number(intervalInput.value) || 1)
-    };
+    return select.value;
 }
 
 function setRecurrenceControls(select, intervalInput, endDateInput) {
@@ -1261,15 +1258,29 @@ function getLocalTimeFromIso(value) {
 }
 
 function mapTask(task) {
+    let recurrenceRule = null;
+    if (task.recurrence_rule && task.recurrence_rule !== "none") {
+        try {
+            const frequency = typeof task.recurrence_rule === "string"
+                ? task.recurrence_rule
+                : task.recurrence_rule.frequency;
+            recurrenceRule = {
+                frequency,
+                interval: Math.max(1, Number(task.recurrence_interval) || 1)
+            };
+        } catch (error) {
+            console.error("Could not parse recurrence rule.", error);
+        }
+    }
     return {
         id: task.id,
         text: task.text,
-        description: task.description || "",
+        description: task.description ?? "",
         dueDate: task.due_date || "",
         dueAt: task.due_at || "",
         reminderEnabled: Boolean(task.reminder_enabled),
         reminderOptions: task.reminder_options || [],
-        recurrenceRule: task.recurrence_rule || null,
+        recurrenceRule,
         recurrenceEndDate: task.recurrence_end_date || "",
         recurrenceActive: Boolean(task.recurrence_active),
         recurrenceSeriesId: task.recurrence_series_id || "",
@@ -1324,6 +1335,7 @@ async function addTask(event) {
             reminder_enabled: taskReminderEnabled.checked && Boolean(taskDueTime.value),
             reminder_options: taskReminderEnabled.checked ? getSelectedValues(taskReminderOptions) : [],
             recurrence_rule: getRecurrenceRule(taskRecurrence, taskRecurrenceInterval),
+            recurrence_interval: Math.max(1, Number(taskRecurrenceInterval.value) || 1),
             recurrence_end_date: taskRecurrence.value === "none" ? null : taskRecurrenceEndDate.value || null,
             recurrence_active: taskRecurrence.value !== "none",
             category: taskCategory.value,
@@ -1468,6 +1480,7 @@ async function saveEditedTask(event) {
                 reminder_enabled: editTaskReminderEnabled.checked && Boolean(editTaskDueTime.value),
                 reminder_options: editTaskReminderEnabled.checked ? getSelectedValues(editTaskReminderOptions) : [],
                 recurrence_rule: getRecurrenceRule(editTaskRecurrence, editTaskRecurrenceInterval),
+                recurrence_interval: Math.max(1, Number(editTaskRecurrenceInterval.value) || 1),
                 recurrence_end_date: editTaskRecurrence.value === "none" ? null : editTaskRecurrenceEndDate.value || null,
                 recurrence_active: editTaskRecurrence.value !== "none" && editTaskRecurrenceActive.checked,
                 category: editTaskCategory.value,
