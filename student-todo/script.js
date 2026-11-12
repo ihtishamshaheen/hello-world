@@ -1556,6 +1556,7 @@ function updateLocalDateTime() {
 
 async function initialize() {
     setTheme(localStorage.getItem(themeKey) || "light");
+    setAuthMode("login");
     updateDashboardDate();
     updateLocalDateTime();
     setInterval(updateLocalDateTime, 1000);
