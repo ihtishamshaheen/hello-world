@@ -243,15 +243,21 @@ function renderStudyStreak() {
     });
 }
 
-function getGreeting(hour = new Date().getHours()) {
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-}
-
 function updateDashboardDate() {
     const now = new Date();
-    dashboardHeading.textContent = getGreeting(now.getHours());
+    const hour = now.getHours();
+
+    let greeting;
+
+    if (hour >= 5 && hour < 12) {
+        greeting = "Good morning";
+    } else if (hour >= 12 && hour < 17) {
+        greeting = "Good afternoon";
+    } else {
+        greeting = "Good evening";
+    }
+
+    dashboardHeading.textContent = greeting;
     dashboardDate.textContent = new Intl.DateTimeFormat(undefined, {
         weekday: "long", month: "long", day: "numeric", year: "numeric"
     }).format(now);
