@@ -1072,7 +1072,14 @@ function showApp(user) {
     currentUser = user;
     authShell.hidden = true;
     appShell.hidden = false;
-    document.getElementById("userInfo").textContent = `Signed in as ${user.email}`;
+    const metadata = user.user_metadata || {};
+    const metadataName = [metadata.full_name, metadata.name, metadata.username]
+        .find((value) => typeof value === "string" && value.trim());
+    const emailName = typeof user.email === "string"
+        ? user.email.split("@")[0]
+        : "there";
+    const displayName = (metadataName || emailName).trim();
+    document.getElementById("userInfo").textContent = `Welcome, ${displayName}`;
     loadTasks();
 }
 
